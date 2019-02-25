@@ -6,12 +6,12 @@ class Net:
 	def __init__(self):
 		# Your training data
 		self.x_train = np.linspace(-np.pi, np.pi * 2, num=10000)
-		self.y_train = np.sin(self.x_train) + self.x_train / 3 + (np.random.rand(10000) - 0.5) / 5
+		self.y_train = np.sin(self.x_train) + self.x_train / 3 + np.random.randn(10000) / 10
 
-		# Some parameters (feel free to edit these)
+		# Some parameters (feel free to edit the hidden sizes and number of epochs)
 		self.input_size, self.output_size = 1, 1
 		self.hidden_size1, self.hidden_size2 = 128, 128
-		self.num_epochs = 10000
+		self.num_epochs = 5000
 
 		# Starting a TensorFlow session
 		self.sess = tf.Session()
