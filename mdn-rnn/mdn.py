@@ -1,13 +1,13 @@
 # Author: Joey Hejna
 # Resource: https://github.com/yanji84/keras-mdn/blob/master/mdn.py
 
+import numpy as np
 import keras
 from keras import backend as K
 from keras.layers import Layer, Dense
 
 ## CONSTANTS
 logSqrtTwoPI = np.log(np.sqrt(2.0 * np.pi))
-
 
 class MDN(Layer):
 
@@ -43,20 +43,15 @@ def get_mdn_coef(output):
 	  return logmix, mean, logstd
 '''
 
-def get_lossfunc(logmix, mean, logstd, y):
-	v = logmix + lognormal(y, mean, logstd)
-	v = K.logsumexp(v, 1, keepdims=True)
-	return -K.mean(v) #perhaps axis=1 and keepdims?
-
-def get_mixture_coef(output):
+def get_mdn_coef(output):
 	# first column is the batch dimension
 	assert output.shape[0] % 3 == 0
 
 	num_components = output.shape[1] / 3
 	
-	logmix = output[:,:num_components]
-	mean = output[:,num_components:2*num_components]
-	logstd = output[:,2*num_components:]
+	logmix = output[:, :num_components]
+	mean = output[:,num_components: 2*num_components]
+	logstd = output[:, 2*num_components:]
 
 	logmix = logmix - K.logsumexp(logmix, axis=1, keepdims=True)
 
@@ -64,3 +59,21 @@ def get_mixture_coef(output):
 
 def lognormal(y, mean, logstd):
 	return -0.5 * ((y - mean) / K.exp(logstd)) ** 2 - logstd - logSqrtTwoPI
+
+def get_lossfunc(logmix, mean, logstd, y):
+	v = logmix + lognormal(y, mean, logstd)
+	v = K.logsumexp(v, 1, keepdims=True)
+	return -K.mean(v) #perhaps axis=1 and keepdims?
+
+def mdn_loss():
+	def loss(y, output):
+		logmix, mean, logstd = get_mdn_coef(output)
+		return get_lossfunc(logmix, mean, logstd, y)
+	return loss
+
+def main():
+	# TODO: Write MDN test here
+	return
+
+if __name__ == "__main__":
+	main()
