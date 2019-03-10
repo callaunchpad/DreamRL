@@ -42,7 +42,7 @@ def plot_results(models,
 
     encoder, decoder = models
     x_test, y_test = data
-    os.makedirs(model_name, exist_ok=True)
+    # os.makedirs(model_name, exist_ok=True)
 
     filename = os.path.join("vae_mean.png")
     # display a 2D plot of the digit classes in the latent space
@@ -88,7 +88,7 @@ def plot_results(models,
     plt.savefig(filename)
     plt.show()
 
-(x_train, y_train), (x_test, y_test) = mnist.load_data()
+(x_train, y_train), (x_test, y_test) = mnist.load_data() # change this line
 
 image_size = x_train.shape[1]
 original_dim = image_size * image_size
@@ -98,17 +98,19 @@ x_train = x_train.astype('float32') / 255
 x_test = x_test.astype('float32') / 255
 
 # network parameters
-input_shape = (28, 28, 1)
+input_shape = (image_size, image_size, 1)
 batch_size = 128
+kernel_size = 4
+filters = 32
 latent_dim = 2
-epochs = 1
+epochs = 30
 
 inputs = Input(shape=input_shape, name='encoder_input')
-x1 = keras.layers.convolutional.Conv2D(32, 4, strides=2, activation='relu',padding='same')(inputs)
-x2 = keras.layers.convolutional.Conv2D(64, 4, strides=2, activation='relu',padding='same')(x1)
+x1 = keras.layers.convolutional.Conv2D(filters, kernel_size, strides=2, activation='relu',padding='same')(inputs)
+x2 = keras.layers.convolutional.Conv2D(filters*2, kernel_size, strides=2, activation='relu',padding='same')(x1)
 # x3 = keras.layers.Conv2D(128, 4, 2, activation='relu')(x2)
 shape = K.int_shape(x2)
-print(shape)
+# print(shape)
 xf = keras.layers.Flatten()(x2)
 xf = Dense(16, activation='relu')(xf)
 z_mean = Dense(latent_dim, name='z_mean')(xf)
@@ -123,10 +125,10 @@ encoder.summary() #??
 latent_inputs = Input(shape=(latent_dim,), name='z_sampling')
 y = Dense(shape[1] * shape[2] * shape[3], activation='relu')(latent_inputs)
 y = keras.layers.Reshape((shape[1], shape[2], shape[3]))(y)
-y1 = keras.layers.Conv2DTranspose(64, 4, strides=2, activation='relu',padding='same')(y)
-y2 = keras.layers.Conv2DTranspose(32, 4, strides=2, activation='relu',padding='same')(y1)
+y1 = keras.layers.Conv2DTranspose(filters*2, kernel_size, strides=2, activation='relu',padding='same')(y)
+y2 = keras.layers.Conv2DTranspose(filters, kernel_size, strides=2, activation='relu',padding='same')(y1)
 # outputs = Dense(original_dim, activation='sigmoid')(y2)
-outputs = keras.layers.Conv2DTranspose(1, 4, strides=1, activation='sigmoid', padding='same')(y2)
+outputs = keras.layers.Conv2DTranspose(1, kernel_size, strides=1, activation='sigmoid', padding='same')(y2)
 
 decoder = Model(latent_inputs, outputs, name='decoder')
 decoder.summary()
@@ -179,7 +181,9 @@ if __name__ == '__main__':
     parser.add_argument("-w", "--weights", help=help_)
     help_ = "Use mse loss instead of binary cross entropy (default)"
     parser.add_argument("-m", "--mse", help=help_, action='store_true')
+    # parser.add_argument("-l", "--latent_size", help=help_)
     args = parser.parse_args()
+    # latent_dim = args.latent_size
     models = (encoder, decoder)
     data = (x_test, y_test)
 
