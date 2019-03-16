@@ -4,26 +4,53 @@
 import numpy as np
 import keras
 from keras import backend as K
-from keras.layers import Layer, Dense, Dropout, Activation
-from keras.activations import softmax
+from keras.layers import Layer, Dense, Dropout, Activation, LSTM
+from keras.activations import softmax, tanh
 from keras.models import Sequential
 
 ## CONSTANTS
 logSqrtTwoPI = np.log(np.sqrt(2.0 * np.pi))
+PARAM_DEFAULTS = {
+	'rnn': {
+		'dropout': 0,
+		'neurons': 512,
+		'activation' : tanh
+	},
+	'dense': {
+		'dropout': 0,
+		'neurons': 256,
+		'activation': tanh
+	}
+}
 
 class MDN(Layer):
 
+	# output_dim should be 3 * num_mix
     def __init__(self, num_mix, output_dim, **kwargs):
         self.output_dim = output_dim
         self.num_mix = num_mix
-        self.mdn_layer_mus = Dense(self.num_mix * self.output_dim, name='mdn_mus')  
-        self.mdn_layer_sigmas = Dense(self.num_mix * self.output_dim, activation=exp, name='mdn_sigmas')  # mix*output vals exp activation
+        self.mdn_layer_mus = Dense(self.num_mix, name='mdn_mus')  
+        self.mdn_layer_sigmas = Dense(self.num_mix, activation=exp, name='mdn_sigmas') 
         self.mdn_layer_pi = Dense(self.num_mix, activation = softmax, name='mdn_pi')  
         super(MDN, self).__init__(**kwargs)
 
     def model(self, input_shape, layer_params):
+    	# set default params
+    	for layer_type in PARAM_DEFAULTS:
+    		for i in range(len(layer_params[layer_type])):
+    			for param in PARAM_DEFAULTS[layer_type]:
+    				if param not in layer_params[layer_type][i]:
+    					layer_params[layer_type][i][param] = PARAM_DEFAULTS[layer_type][param]
+
         # initialize empty model
         self.model = Sequential()
+
+        # add RNN layers
+        for layer_rnn in layer_params['rnn']:
+        	self.model.add(LSTM(layer_rnn['neurons'],
+        				   activation=layer_rnn['activation']))
+        	if layer_rnn['dropout'] > 0:
+        		self.model.add(Dropout(layer_rnn['dropout']))
 
         # add dense layers
         cur_shape = input_shape[1]
@@ -36,8 +63,7 @@ class MDN(Layer):
             if layer_dense['dropout'] > 0:
                 self.model.add(Dropout(layer_dense['dropout']))
 
-        # add RNN layers
-
+        return self.model
 
 
     def build(self, input_shape):
