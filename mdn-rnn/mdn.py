@@ -27,11 +27,9 @@ class MDN(Layer):
 
 	# output_dim should be 3 * num_mix
     def __init__(self, num_mix, output_dim, **kwargs):
+    	assert num_mix * 3 == output_dim, "output_dim must be 3x num_mix!"
         self.output_dim = output_dim
         self.num_mix = num_mix
-        self.mdn_layer_mus = Dense(self.num_mix, name='mdn_mus')  
-        self.mdn_layer_sigmas = Dense(self.num_mix, activation=exp, name='mdn_sigmas') 
-        self.mdn_layer_pi = Dense(self.num_mix, activation = softmax, name='mdn_pi')  
         super(MDN, self).__init__(**kwargs)
 
     def model(self, input_shape, layer_params):
@@ -41,6 +39,9 @@ class MDN(Layer):
     			for param in PARAM_DEFAULTS[layer_type]:
     				if param not in layer_params[layer_type][i]:
     					layer_params[layer_type][i][param] = PARAM_DEFAULTS[layer_type][param]
+
+    	# assert last dense layer neurons matches w output_dim
+    	assert layer_params['dense'][-1]['neurons'] == self.output_dim, 'last dense layer must match up with output_dim!'
 
         # initialize empty model
         self.model = Sequential()
