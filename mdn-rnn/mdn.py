@@ -26,13 +26,23 @@ PARAM_DEFAULTS = {
 class MDN(Layer):
 
 	# output_dim should be 3 * num_mix
-    def __init__(self, num_mix, output_dim, **kwargs):
+    def __init__(self, num_mix, output_dim, input_shape, layer_params **kwargs):
     	assert num_mix * 3 == output_dim, "output_dim must be 3x num_mix!"
+
         self.output_dim = output_dim
         self.num_mix = num_mix
+        self.input_shape = input_shape
+        self.layer_params = layer_params
         super(MDN, self).__init__(**kwargs)
 
-    def model(self, input_shape, layer_params):
+    def set_model(self, input_shape=None, layer_params=None):
+    	# check defaults
+    	if input_shape is None:
+    		input_shape = self.input_shape
+
+    	if layer_params is None:
+    		layer_params = self.layer_params
+
     	# set default params
     	for layer_type in PARAM_DEFAULTS:
     		for i in range(len(layer_params[layer_type])):
@@ -65,6 +75,13 @@ class MDN(Layer):
                 self.model.add(Dropout(layer_dense['dropout']))
 
         return self.model
+
+    def train_rnn(npz_file_path, latent_size, action_size):
+    	pass
+
+    def load_model(weights_file_path):
+    	self.set_model()
+    	self.model.load_weights(weights_file_path)
 
 
     def build(self, input_shape):
