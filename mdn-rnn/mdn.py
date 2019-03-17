@@ -1,17 +1,22 @@
-# Author: Joey Hejna
+# Author: Joey Hejna, Jihan
 # Resource: https://github.com/yanji84/keras-mdn/blob/master/mdn.py
 
 import numpy as np
 import keras
 from keras import backend as K
+<<<<<<< HEAD
 from keras import layers
 from keras.models import Model, Sequential
+=======
+from keras.layers import Layer, Dense, Dropout, Activation, LSTM
+from keras.activations import softmax, tanh
+from keras.models import Sequential
+>>>>>>> 1788777564a337a6cb290e589425416d24c9a8ad
 
 ## CONSTANTS
 logSqrtTwoPI = np.log(np.sqrt(2.0 * np.pi))
 
 class MDN(layers.Layer):
-
 	def __init__(self, output_dim, **kwargs):
 		self.output_dim = output_dim
 		super(MDN, self).__init__(**kwargs)
@@ -39,9 +44,9 @@ class MDN(layers.Layer):
 
 '''
 def get_mdn_coef(output):
-	  logmix, mean, logstd = tf.split(output, 3, 1)
-	  logmix = logmix - tf.reduce_logsumexp(logmix, 1, keepdims=True)
-	  return logmix, mean, logstd
+      logmix, mean, logstd = tf.split(output, 3, 1)
+      logmix = logmix - tf.reduce_logsumexp(logmix, 1, keepdims=True)
+      return logmix, mean, logstd
 '''
 
 class MDNRNN():
@@ -127,4 +132,4 @@ def main():
 
 
 if __name__ == "__main__":
-	main()
+    main()
