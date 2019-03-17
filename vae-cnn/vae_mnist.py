@@ -8,6 +8,7 @@ from keras import backend as K
 from keras.models import Model
 from keras.layers import Lambda, Input, Dense
 
+from sklearn.model_selection import train_test_split 
 import numpy as np
 import matplotlib.pyplot as plt
 from os import sys
@@ -21,7 +22,7 @@ class VAE:
         self.kernel_size = 4
         self.filters = 32
         self.epochs = 30
-        self.lr = .001
+        self.lr = .0001
         self.model_name = "conv_vae_latent_{}"
 
     def sampling(self, args):
@@ -100,11 +101,21 @@ class VAE:
         plt.show()
 
     def load_data(self, npz):
-        (x_train, y_train), (x_test, y_test) = npz.load_data() # change this line
-        # data = np.load("CartPole-v0_10_10.npz")
-        image_size = x_train.shape[1]
-        x_train = np.reshape(x_train, [-1, image_size, image_size, 1])
-        x_test = np.reshape(x_test, [-1, image_size, image_size, 1])
+        data = np.load(npz)
+        p = np.array(data['arr_1'])
+       
+        #print(data['arr_1'][0])
+        files = data.files 
+        files.remove('arr_1')
+        for i in files: 
+            np.append(p, data[i])
+        # print(p)
+        x_train, x_test, y_train, y_test = train_test_split(p, p)
+        print(x_train.shape)
+        image_size_x = x_train.shape[1]
+        image_size_y = x_train.shape[2]
+        x_train = np.reshape(x_train, [-1, image_size_x, image_size_y, 1])
+        x_test = np.reshape(x_test, [-1, image_size_x, image_size_y, 1])
         x_train = x_train.astype('float32') / 255
         x_test = x_test.astype('float32') / 255
         return (x_train, y_train), (x_test, y_test)
@@ -146,8 +157,9 @@ class VAE:
 
     def make_vae(self, npz_file_path, latent_size):
         (self.x_train, y_train), (self.x_test, y_test) = self.load_data(npz_file_path)
-        image_size = self.x_train.shape[1]
-        input_shape = (image_size, image_size, 1)
+        image_size_x = self.x_train.shape[1]
+        image_size_y = self.x_train.shape[2]
+        input_shape = (image_size_x, image_size_y, 1)
         self.inputs = Input(shape=input_shape, name='encoder_input')
         self.encoder, self.decoder, self.outputs, self.vae = self.make_models(self.inputs, latent_size)
 
@@ -155,7 +167,7 @@ class VAE:
         data = (self.x_test, y_test)
         reconstruction_loss = binary_crossentropy(K.flatten(self.inputs),
                                                   K.flatten(self.outputs))
-        reconstruction_loss *= image_size * image_size
+        reconstruction_loss *= image_size_x * image_size_y
         kl_loss = 1 + self.z_log_var - K.square(self.z_mean) - K.exp(self.z_log_var)
         kl_loss = K.sum(kl_loss, axis=-1)
         kl_loss *= -0.5
@@ -230,7 +242,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
     # latent_dim = args.latent_size
     convVae = VAE()
-    convVae.make_vae(mnist, 2)
+    convVae.make_vae("CartPole-v0_10_10.npz", 2)
     # plot_model(vae, to_file='vae_cnn.png', show_shapes=True)
 
     if args.weights:
