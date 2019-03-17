@@ -4,106 +4,43 @@
 import numpy as np
 import keras
 from keras import backend as K
+<<<<<<< HEAD
+from keras import layers
+from keras.models import Model, Sequential
+=======
 from keras.layers import Layer, Dense, Dropout, Activation, LSTM
 from keras.activations import softmax, tanh
 from keras.models import Sequential
+>>>>>>> 1788777564a337a6cb290e589425416d24c9a8ad
 
 ## CONSTANTS
 logSqrtTwoPI = np.log(np.sqrt(2.0 * np.pi))
-PARAM_DEFAULTS = {
-	'rnn': {
-		'dropout': 0,
-		'neurons': 512,
-		'activation' : tanh
-	},
-	'dense': {
-		'dropout': 0,
-		'neurons': 256,
-		'activation': tanh
-	}
-}
 
-class MDN(Layer):
+class MDN(layers.Layer):
+	def __init__(self, output_dim, **kwargs):
+		self.output_dim = output_dim
+		super(MDN, self).__init__(**kwargs)
 
-	# output_dim should be 3 * num_mix
-    def __init__(self, num_mix, output_dim, input_shape, layer_params **kwargs):
-    	assert num_mix * 3 == output_dim, "output_dim must be 3x num_mix!"
+	def build(self, input_shape):
+		# Create a trainable weight variable for this layer.
+		self.kernel = self.add_weight(name='kernel', 
+									shape=(input_shape[1], self.output_dim),
+									initializer='truncated_normal',
+									trainable=True)
+		self.bias = self.add_weight(name='kernel', 
+									shape=(self.output_dim,),
+									initializer='zeros',
+									trainable=True)
 
-        self.output_dim = output_dim
-        self.num_mix = num_mix
-        self.input_shape = input_shape
-        self.layer_params = layer_params
-        super(MDN, self).__init__(**kwargs)
+		super(MDN, self).build(input_shape)  # Be sure to call this at the end
 
-    def set_model(self, input_shape=None, layer_params=None):
-    	# check defaults
-    	if input_shape is None:
-    		input_shape = self.input_shape
+	def call(self, x):
+		output = K.dot(x, self.kernel)
+		output = K.bias_add(output, self.bias)
+		return output
 
-    	if layer_params is None:
-    		layer_params = self.layer_params
-
-    	# set default params
-    	for layer_type in PARAM_DEFAULTS:
-    		for i in range(len(layer_params[layer_type])):
-    			for param in PARAM_DEFAULTS[layer_type]:
-    				if param not in layer_params[layer_type][i]:
-    					layer_params[layer_type][i][param] = PARAM_DEFAULTS[layer_type][param]
-
-    	# assert last dense layer neurons matches w output_dim
-    	assert layer_params['dense'][-1]['neurons'] == self.output_dim, 'last dense layer must match up with output_dim!'
-
-        # initialize empty model
-        self.model = Sequential()
-
-        # add RNN layers
-        for layer_rnn in layer_params['rnn']:
-        	self.model.add(LSTM(layer_rnn['neurons'],
-        				   activation=layer_rnn['activation']))
-        	if layer_rnn['dropout'] > 0:
-        		self.model.add(Dropout(layer_rnn['dropout']))
-
-        # add dense layers
-        cur_shape = input_shape[1]
-        for layer_dense in layer_params['dense']:
-            self.model.add(Dense(layer_dense['neurons'],
-                           batch_input_shape=(None, cur_shape),
-                           activation=layer_dense['activation']))
-            cur_shape = layer_dense['neurons']
-
-            if layer_dense['dropout'] > 0:
-                self.model.add(Dropout(layer_dense['dropout']))
-
-        return self.model
-
-    def train_rnn(npz_file_path, latent_size, action_size):
-    	pass
-
-    def load_model(weights_file_path):
-    	self.set_model()
-    	self.model.load_weights(weights_file_path)
-
-
-    def build(self, input_shape):
-        # Create a trainable weight variable for this layer.
-        self.kernel = self.add_weight(name='kernel', 
-                                    shape=(input_shape[1], self.output_dim),
-                                    initializer='truncated_normal',
-                                    trainable=True)
-        self.bias = self.add_weight(name='kernel', 
-                                    shape=(input_shape[1], self.output_dim),
-                                    initializer='zeros',
-                                    trainable=True)
-
-        super(MDN, self).build(input_shape)  # Be sure to call this at the end
-
-    def call(self, x):
-        output = K.dot(x, self.kernel)
-        output = K.add_bias(output, self.bias)
-        return output
-
-    def compute_output_shape(self, input_shape):
-        return (input_shape[0], self.output_dim)
+	def compute_output_shape(self, input_shape):
+		return (input_shape[0], self.output_dim)
 
 '''
 def get_mdn_coef(output):
@@ -112,41 +49,87 @@ def get_mdn_coef(output):
       return logmix, mean, logstd
 '''
 
-def get_mdn_coef(output):
-    # first column is the batch dimension
-    assert output.shape[0] % 3 == 0
+class MDNRNN():
+	def __init__(self, hyperparameters):
+		self.hps = hyperparameters
+		self.build_model()
 
-    num_components = output.shape[1] / 3
-    
-    logmix = output[:, :num_components]
-    mean = output[:,num_components: 2*num_components]
-    logstd = output[:, 2*num_components:]
+	def build_model(self):
+		# Batch dimension????
+		self.input = layers.Input(shape=(self.hps['max_seq_len'], self.hps['in_width']), dtype='float32')
+		# hidden_state, self.last_state
+		rnn_out, self.hidden_state, self.cell_state = layers.LSTM(self.hps['rnn_size'], return_sequences=True, return_state=True, dropout=0.0, recurrent_dropout=0.0)(self.input)
+		self.output = layers.TimeDistributed(MDN(self.hps['out_width'] * self.hps['kmix'] * 3))(rnn_out)
+		self.model = Model(self.input, self.output)
+		print("Input:", self.model.input)
+		print("Output:", self.model.output)
+		self.model.compile(optimizer='adam', loss=MDNRNN.mdn_loss())
+		
+	def train(self, x, y):
 
-    logmix = logmix - K.logsumexp(logmix, axis=1, keepdims=True)
+		self.model.fit(x, y, batch_size=self.hps['batch_size'], validation_split=self.hps['validation_split'])
 
-    return logmix, mean, logstd
+	def test(self, x, y):
+		loss, acc = self.model.evaluate(x, y, batch_size=self.hps[batch_size])
 
-def lognormal(y, mean, logstd):
-    return -0.5 * ((y - mean) / K.exp(logstd)) ** 2 - logstd - logSqrtTwoPI
+	def get_mdn_coef(output):
+		# first column is the batch dimension
+		assert output.shape[2] % 3 == 0
+		print(' in get mdn coef')
+		num_components = int(int(output.shape[2]) / 3)
+		
+		logmix = output[:, :, :num_components]
+		mean = output[:, :, num_components: 2*num_components]
+		logstd = output[:, :, 2*num_components:]
 
-def get_lossfunc(logmix, mean, logstd, y):
-    v = logmix + lognormal(y, mean, logstd)
-    v = K.logsumexp(v, 1, keepdims=True)
-    return -K.mean(v) #perhaps axis=1 and keepdims?
+		logmix = logmix - K.logsumexp(logmix, axis=2, keepdims=True)
 
-def mdn_loss():
-    def loss(y, output):
-        logmix, mean, logstd = get_mdn_coef(output)
-        return get_lossfunc(logmix, mean, logstd, y)
-    return loss
+		return logmix, mean, logstd
 
-def exp(x):
-    return e ** x
+	def lognormal(y, mean, logstd):
+
+		return -0.5 * ((y - mean) / K.exp(logstd)) ** 2 - logstd - logSqrtTwoPI
+
+	def get_lossfunc(logmix, mean, logstd, y):
+		print(' in get loss')
+
+		v = logmix + MDNRNN.lognormal(y, mean, logstd)
+		print('log normal shape', v.shape)
+		v = K.logsumexp(v, 2, keepdims=True)
+		print('log normal shape', v.shape)
+
+		out = -K.mean(v)
+		return out #perhaps axis=1 and keepdims?
+
+	def mdn_loss():
+		def loss(y, output):
+			print("OUTPUT SHAPE", output.shape)
+			logmix, mean, logstd = MDNRNN.get_mdn_coef(output)
+			print('IN LOSS - mix, mean, std:', logmix.shape, mean.shape, logstd.shape)
+			return MDNRNN.get_lossfunc(logmix, mean, logstd, y)
+		return loss
 
 def main():
-    # TODO: Write MDN test here
-    model = MDN(100, 100)
-    return
+	# TODO: Write MDN test here
+	hps = {}
+	hps['batch_size'] = 7
+	hps['max_seq_len'] = 16
+	hps['in_width'] = 8 # latent + action
+	hps['out_width'] = 6 # Latent
+	hps['rnn_size'] = 10
+	hps['kmix'] = 3
+	hps['validation_split'] = 0.1
+
+	mdnrnn = MDNRNN(hps)
+	print("####################################")
+	print("FINISHED BUILD")
+	# X Size = (DIMS, max seq, in_width)
+	X = np.random.normal(size=(1000, hps['max_seq_len'], hps['in_width']))
+	
+	Y = np.random.normal(size=(1000, hps['max_seq_len'], hps['out_width']))
+
+	mdnrnn.train(X, Y)
+
 
 if __name__ == "__main__":
     main()
