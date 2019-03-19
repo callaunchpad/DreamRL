@@ -4,11 +4,11 @@ import keras
 from keras.datasets import mnist
 from keras.losses import mse, binary_crossentropy
 from keras import backend as K
-# from keras.utils import plot_model
+from keras.utils import plot_model
 from keras.models import Model
 from keras.layers import Lambda, Input, Dense
 
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import train_test_split 
 import numpy as np
 import matplotlib.pyplot as plt
 from os import sys
@@ -102,12 +102,11 @@ class VAE:
 
     def load_data(self, npz):
         data = np.load(npz)
-        p = np.array(data['arr_1'])
-
-        #print(data['arr_1'][0])
         files = data.files
-        files.remove('arr_1')
-        for i in files:
+        p = np.array(data[files[0]])
+        #print(data['arr_1'][0]) 
+        files.remove(files[0])
+        for i in files: 
             np.append(p, data[i])
         # print(p)
         x_train, x_test, y_train, y_test = train_test_split(p, p)
@@ -155,8 +154,8 @@ class VAE:
 
         return encoder, decoder, self.outputs, vae
 
-    def make_vae(self, npz_file_path, latent_size):
-        (self.x_train, y_train), (self.x_test, y_test) = self.load_data(npz_file_path)
+    def make_vae(self, npz, latent_size):
+        (self.x_train, y_train), (self.x_test, y_test) = self.load_data(npz)
         image_size_x = self.x_train.shape[1]
         image_size_y = self.x_train.shape[2]
         input_shape = (image_size_x, image_size_y, 1)
@@ -173,9 +172,8 @@ class VAE:
         kl_loss *= -0.5
         vae_loss = K.mean(reconstruction_loss + kl_loss)
         self.vae.add_loss(vae_loss)
-        optimizer = keras.optimizers.RMSprop(lr=self.lr, rho=0.9, epsilon=None, decay=0.0)
-        # optimizer = keras.optimizers.Adam(lr=0.001, beta_1=0.9, beta_2=0.999, epsilon=None, decay=0.0, amsgrad=False)
-        self.vae.compile(optimizer)
+        rmsprop = keras.optimizers.RMSprop(lr=self.lr, rho=0.9, epsilon=None, decay=0.0)
+        self.vae.compile(rmsprop)
         self.vae.summary()
 
     def train_vae(self):
@@ -193,7 +191,7 @@ class VAE:
         return z
 
     def decode_latent(self, latent_vector):
-        return self.decoder.predict(latent_vector);
+        return self.decoder.predict(latent_vector)
 
 
     # if __name__ == '__main__':
@@ -243,12 +241,14 @@ if __name__ == '__main__':
     args = parser.parse_args()
     # latent_dim = args.latent_size
     convVae = VAE()
+    # TODO: put this in to argumentparser 
     convVae.make_vae("CartPole-v0_10_10.npz", 2)
-    # plot_model(vae, to_file='vae_cnn.png', show_shapes=True)
+    # The below line requires a ton of arguments 
+    # plot_model(convVae, to_file='vae_cnn.png', show_shapes=True)
 
     if args.weights:
         convVae.load_model(args.weights)
     else:
         convVae.train_vae()
 
-    # plot_results(models, data, batch_size=self.batch_size, model_name="vae_cnn")
+    #convVae.plot_results(models, data, batch_size=self.batch_size, model_name="vae_cnn")
