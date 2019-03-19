@@ -110,7 +110,7 @@ class VAE:
             np.append(p, data[i])
         # print(p)
         x_train, x_test, y_train, y_test = train_test_split(p, p)
-        print(x_train.shape)
+        # print(x_train.shape)
         image_size_x = x_train.shape[1]
         image_size_y = x_train.shape[2]
         x_train = np.reshape(x_train, [-1, image_size_x, image_size_y, 1])
@@ -161,7 +161,16 @@ class VAE:
         input_shape = (image_size_x, image_size_y, 1)
         self.inputs = Input(shape=input_shape, name='encoder_input')
         self.encoder, self.decoder, self.outputs, self.vae = self.make_models(self.inputs, latent_size)
+        
+        # CODE THAT TESTS IF ENCODING AND DECODING WORKS 
+        x_test_feed = np.reshape(self.x_test, [-1, image_size_x, image_size_y, 1])
+        latent_vector = self.encode_image(x_test_feed)
+        print("output for encode:" )
+        print(latent_vector)
+        print("output for decode:" )
+        print(self.decode_latent(latent_vector))
 
+        
         models = (self.encoder, self.decoder)
         data = (self.x_test, y_test)
         reconstruction_loss = binary_crossentropy(K.flatten(self.inputs),
@@ -188,7 +197,7 @@ class VAE:
 
     def encode_image(self, image):
         z_mean, z_log_var, z = self.encoder.predict(image, batch_size=1)
-        return z
+        return z_mean
 
     def decode_latent(self, latent_vector):
         return self.decoder.predict(latent_vector)
