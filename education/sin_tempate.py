@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 class Net:
 	def __init__(self):
 		# Your training data
-		self.x_train = np.linspace(-np.pi, np.pi * 2, num=10000)
+		self.x_train = np.linspace(-np.pi * 2, np.pi * 2, num=10000)
 		self.y_train = np.sin(self.x_train) + self.x_train / 3 + np.random.randn(10000) / 10
 
 		# Some parameters (feel free to edit the hidden sizes and number of epochs)
