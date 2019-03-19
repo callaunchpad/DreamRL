@@ -8,7 +8,7 @@ from keras import backend as K
 from keras.models import Model
 from keras.layers import Lambda, Input, Dense
 
-from sklearn.model_selection import train_test_split 
+from sklearn.model_selection import train_test_split
 import numpy as np
 import matplotlib.pyplot as plt
 from os import sys
@@ -23,7 +23,7 @@ class VAE:
         self.filters = 32
         self.epochs = 30
         self.lr = .0001
-        self.model_name = "conv_vae_latent_{}"
+        self.model_name = "conv_vae_latent_{}.h5"
 
     def sampling(self, args):
         """Reparameterization trick by sampling from an isotropic unit Gaussian.
@@ -103,11 +103,11 @@ class VAE:
     def load_data(self, npz):
         data = np.load(npz)
         p = np.array(data['arr_1'])
-       
+
         #print(data['arr_1'][0])
-        files = data.files 
+        files = data.files
         files.remove('arr_1')
-        for i in files: 
+        for i in files:
             np.append(p, data[i])
         # print(p)
         x_train, x_test, y_train, y_test = train_test_split(p, p)
@@ -121,7 +121,7 @@ class VAE:
         return (x_train, y_train), (x_test, y_test)
 
     def make_models(self, inputs, latent_dim=2):
-        self.model_name.format(latent_dim)
+        self.model_name = self.model_name.format(latent_dim)
         x1 = keras.layers.convolutional.Conv2D(self.filters, self.kernel_size, strides=2, activation='relu',padding='same')(inputs)
         x2 = keras.layers.convolutional.Conv2D(self.filters*2, self.kernel_size, strides=2, activation='relu',padding='same')(x1)
         # x3 = keras.layers.Conv2D(128, 4, 2, activation='relu')(x2)
@@ -173,8 +173,9 @@ class VAE:
         kl_loss *= -0.5
         vae_loss = K.mean(reconstruction_loss + kl_loss)
         self.vae.add_loss(vae_loss)
-        rmsprop = keras.optimizers.RMSprop(lr=self.lr, rho=0.9, epsilon=None, decay=0.0)
-        self.vae.compile(rmsprop)
+        optimizer = keras.optimizers.RMSprop(lr=self.lr, rho=0.9, epsilon=None, decay=0.0)
+        # optimizer = keras.optimizers.Adam(lr=0.001, beta_1=0.9, beta_2=0.999, epsilon=None, decay=0.0, amsgrad=False)
+        self.vae.compile(optimizer)
         self.vae.summary()
 
     def train_vae(self):
@@ -187,12 +188,12 @@ class VAE:
     def load_model(self, weights_file_path):
         self.vae.load_weights(weights_file_path)
 
-    def encode_image(image):
+    def encode_image(self, image):
         z_mean, z_log_var, z = self.encoder.predict(image, batch_size=1)
         return z
 
-    def decode_latent(latent_vector):
-        return decoder.predict(latent_vector);
+    def decode_latent(self, latent_vector):
+        return self.decoder.predict(latent_vector);
 
 
     # if __name__ == '__main__':
