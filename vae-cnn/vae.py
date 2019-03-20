@@ -108,7 +108,7 @@ class VAE:
         #print(data['arr_1'][0])
         files.remove(files[0])
         for i in files:
-            np.append(p, data[i])
+            p = np.append(p, data[i], axis=0)
         # print(p)
         x_train, x_test, y_train, y_test = train_test_split(p, p)
         # print(x_train.shape)
