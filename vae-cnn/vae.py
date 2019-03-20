@@ -4,10 +4,11 @@ import keras
 from keras.datasets import mnist
 from keras.losses import mse, binary_crossentropy
 from keras import backend as K
-# from keras.utils import plot_model
+from keras.utils import plot_model
 from keras.models import Model
 from keras.layers import Lambda, Input, Dense
 
+from sklearn.model_selection import train_test_split
 import numpy as np
 import matplotlib.pyplot as plt
 from os import sys
@@ -17,12 +18,13 @@ import os
 class VAE:
 
     def __init__(self):
-        self.batch_size = 128
+        self.batch_size = 64
         self.kernel_size = 4
         self.filters = 32
-        self.epochs = 30
+        self.epochs = 500
         self.lr = .0001
-        self.model_name = "conv_vae_latent_{}.h5"
+        self.num_channels = 3
+        self.model_name = "conv_vae_latent_{}_model.h5"
 
     def sampling(self, args):
         """Reparameterization trick by sampling from an isotropic unit Gaussian.
@@ -100,11 +102,20 @@ class VAE:
         plt.show()
 
     def load_data(self, npz):
-        (x_train, y_train), (x_test, y_test) = npz.load_data() # change this line
-        # data = np.load("CartPole-v0_10_10.npz")
-        image_size = x_train.shape[1]
-        x_train = np.reshape(x_train, [-1, image_size, image_size, 1])
-        x_test = np.reshape(x_test, [-1, image_size, image_size, 1])
+        data = np.load(npz)
+        files = data.files
+        p = np.array(data[files[0]])
+        #print(data['arr_1'][0])
+        files.remove(files[0])
+        for i in files:
+            np.append(p, data[i])
+        # print(p)
+        x_train, x_test, y_train, y_test = train_test_split(p, p)
+        # print(x_train.shape)
+        image_size_x = x_train.shape[1]
+        image_size_y = x_train.shape[2]
+        x_train = np.reshape(x_train, [-1, image_size_x, image_size_y, self.num_channels]) # 3 is # of color channels
+        x_test = np.reshape(x_test, [-1, image_size_x, image_size_y, self.num_channels])
         x_train = x_train.astype('float32') / 255
         x_test = x_test.astype('float32') / 255
         return (x_train, y_train), (x_test, y_test)
@@ -115,7 +126,7 @@ class VAE:
         x2 = keras.layers.convolutional.Conv2D(self.filters*2, self.kernel_size, strides=2, activation='relu',padding='same')(x1)
         # x3 = keras.layers.Conv2D(128, 4, 2, activation='relu')(x2)
         shape = K.int_shape(x2)
-        # print(shape)
+
         xf = keras.layers.Flatten()(x2)
         xf = Dense(16, activation='relu')(xf)
         self.z_mean = Dense(latent_dim, name='z_mean')(xf)
@@ -124,7 +135,7 @@ class VAE:
         self.z = Lambda(self.sampling, output_shape=(latent_dim,), name='z')([self.z_mean, self.z_log_var]) # latent vec
 
         encoder = Model(inputs, [self.z_mean, self.z_log_var, self.z], name='encoder')
-        encoder.summary() #??
+        encoder.summary()
         # plot_model(encoder, to_file='vae_mlp_encoder.png', show_shapes=True)
 
         latent_inputs = Input(shape=(latent_dim,), name='z_sampling')
@@ -133,7 +144,7 @@ class VAE:
         y1 = keras.layers.Conv2DTranspose(self.filters*2, self.kernel_size, strides=2, activation='relu',padding='same')(y)
         y2 = keras.layers.Conv2DTranspose(self.filters, self.kernel_size, strides=2, activation='relu',padding='same')(y1)
         # outputs = Dense(original_dim, activation='sigmoid')(y2)
-        outputs = keras.layers.Conv2DTranspose(1, self.kernel_size, strides=1, activation='sigmoid', padding='same')(y2)
+        outputs = keras.layers.Conv2DTranspose(self.num_channels, self.kernel_size, strides=1, activation='sigmoid', padding='same')(y2)
 
         decoder = Model(latent_inputs, outputs, name='decoder')
         decoder.summary()
@@ -144,18 +155,28 @@ class VAE:
 
         return encoder, decoder, self.outputs, vae
 
-    def make_vae(self, npz_file_path, latent_size):
-        (self.x_train, y_train), (self.x_test, y_test) = self.load_data(npz_file_path)
-        image_size = self.x_train.shape[1]
-        input_shape = (image_size, image_size, 1)
+    def make_vae(self, npz, latent_size):
+        (self.x_train, y_train), (self.x_test, y_test) = self.load_data(npz)
+        image_size_x = self.x_train.shape[1]
+        image_size_y = self.x_train.shape[2]
+        input_shape = (image_size_x, image_size_y, self.num_channels)
         self.inputs = Input(shape=input_shape, name='encoder_input')
         self.encoder, self.decoder, self.outputs, self.vae = self.make_models(self.inputs, latent_size)
+
+        # CODE THAT TESTS IF ENCODING AND DECODING WORKS
+        # x_test_feed = np.reshape(self.x_test, [-1, image_size_x, image_size_y, 1])
+        # latent_vector = self.encode_image(x_test_feed)
+        # print("output for encode:" )
+        # print(latent_vector)
+        # print("output for decode:" )
+        # print(self.decode_latent(latent_vector))
+
 
         models = (self.encoder, self.decoder)
         data = (self.x_test, y_test)
         reconstruction_loss = binary_crossentropy(K.flatten(self.inputs),
                                                   K.flatten(self.outputs))
-        reconstruction_loss *= image_size * image_size
+        reconstruction_loss *= image_size_x * image_size_y * self.num_channels
         kl_loss = 1 + self.z_log_var - K.square(self.z_mean) - K.exp(self.z_log_var)
         kl_loss = K.sum(kl_loss, axis=-1)
         kl_loss *= -0.5
@@ -171,9 +192,11 @@ class VAE:
                 batch_size=self.batch_size,
                 validation_data=(self.x_test, None))
         self.vae.save_weights(self.model_name)
+        # self.vae.save(self.model_name)
 
     def load_model(self, weights_file_path):
         self.vae.load_weights(weights_file_path)
+        # self.vae = keras.models.load_model(weights_file_path)
 
     def encode_image(self, image):
         z_mean, z_log_var, z = self.encoder.predict(image, batch_size=1)
@@ -230,51 +253,14 @@ if __name__ == '__main__':
     args = parser.parse_args()
     # latent_dim = args.latent_size
     convVae = VAE()
-    convVae.make_vae(mnist, 2)
-    # plot_model(vae, to_file='vae_cnn.png', show_shapes=True)
+    # TODO: put this in to argumentparser
+    convVae.make_vae("CartPole-v0_10_10.npz", 2)
+    # The below line requires a ton of arguments
+    # plot_model(convVae, to_file='vae_cnn.png', show_shapes=True)
 
     if args.weights:
         convVae.load_model(args.weights)
     else:
         convVae.train_vae()
 
-    #convVae.plot_results(models, data, batch_size=self.batch_size, model_name="vae_cnn")
-
-"""
-# random debug stuff
-n = 15 # figure with 15x15 digits
-digit_size = 28
-figure = np.zeros((digit_size * n, digit_size * n))
-
-# grid_x = norm.ppf(np.linspace(0.05, 0.95, n))
-# grid_y = norm.ppf(np.linspace(0.05, 0.95, n))
-grid_x = np.linspace(-4, 4, n)
-grid_y = np.linspace(-4, 4, n)[::-1]
-for i, yi in enumerate(grid_x):
-    for j, xi in enumerate(grid_y):
-        z_sample = np.array([[xi, yi]])
-        if (j % 2 == 0):
-            x_decoded = x_test[i*14 + j: i*14 + j + 1]
-        else:
-            x_decoded = convVae.decode_latent(convVae.encode_image(x_decoded))
-        digit = x_decoded[0]import scipy.misc
-        figure[i * digit_size: (i + 1) * digit_size,
-               j * digit_size: (j + 1) * digit_size] = digit
-
-plt.figure(figsize=(10, 10))
-start_range = digit_size // 2
-end_range = n * digit_size + start_range + 1
-pixel_range = np.arange(start_range, end_range, digit_size)
-sample_range_x = np.round(grid_x, 1)
-sample_range_y = np.round(grid_y, 1)
-plt.xticks(pixel_range, sample_range_x)
-plt.yticks(pixel_range, sample_range_y)
-plt.xlabel("z[0]")
-plt.ylabel("z[1]")
-plt.imshow(figure, cmap='Greys_r')
-# plt.savefig(filename)
-plt.show()
-
-import scipy.misc
-scipy.misc.imsave(filename, digit)
-"""
+    # plot_results(models, data, batch_size=self.batch_size, model_name="vae_cnn")
