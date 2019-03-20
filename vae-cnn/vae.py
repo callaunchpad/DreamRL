@@ -199,7 +199,7 @@ class VAE:
         # self.vae = keras.models.load_model(weights_file_path)
 
     def encode_image(self, image):
-        z_mean, z_log_var, z = self.encoder.predict(image, batch_size=1)
+        z_mean, z_log_var, z = self.encoder.predict(image, batch_size=32) # batch_size is can be changed depending on how much CPU/GPU RAM we have
         return z_mean
 
     def decode_latent(self, latent_vector):
@@ -264,3 +264,20 @@ if __name__ == '__main__':
         convVae.train_vae()
 
     # plot_results(models, data, batch_size=self.batch_size, model_name="vae_cnn")
+
+"""
+scipy.misc.imsave("del.png", convVae.decode_latent(convVae.encode_image(convVae.x_test[0:1]))[0])
+columns = 2
+rows = 3
+fig=plt.figure(figsize=(8, 8))
+t=1
+for i in range(1, columns*rows +1):
+    if (i % 2 == 1):
+        img = convVae.x_test[t-1:t]
+        t += 1
+    else:
+        img = convVae.decode_latent(convVae.encode_image(img))
+    fig.add_subplot(rows, columns, i)
+    plt.imshow(img[0])
+plt.show()
+"""

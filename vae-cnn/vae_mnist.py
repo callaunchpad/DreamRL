@@ -257,7 +257,7 @@ for i, yi in enumerate(grid_x):
             x_decoded = x_test[i*14 + j: i*14 + j + 1]
         else:
             x_decoded = convVae.decode_latent(convVae.encode_image(x_decoded))
-        digit = x_decoded[0]import scipy.misc
+        digit = x_decoded[0]
         figure[i * digit_size: (i + 1) * digit_size,
                j * digit_size: (j + 1) * digit_size] = digit
 
