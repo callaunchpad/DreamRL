@@ -110,7 +110,7 @@ class VAE:
         for i in files:
             p = np.append(p, data[i], axis=0)
         # print(p)
-        x_train, x_test, y_train, y_test = train_test_split(p, p)
+        x_train, x_test, y_train, y_test = train_test_split(p, p, random_state=123456)
         # print(x_train.shape)
         image_size_x = x_train.shape[1]
         image_size_y = x_train.shape[2]
