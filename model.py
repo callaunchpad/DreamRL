@@ -7,27 +7,31 @@ import env_to_imgarr
 sys.path.insert(0, 'mdn-rnn/')
 import mdn
 sys.path.insert(0, 'vae-cnn')
-# import relevant vae file
+import vae
 
-# TODO: finish argparse (include json_path reward_path)
 parser = argparse.ArgumentParser()
 parser.add_argument('env_name', type=str, help='environment name')
+parser.add_argument('json_path', type=str, help='json file path')
+parser.add_argument('reward_path', type=str, help='reward file path')
 
-num_episodes = 50
-num_steps = 100
+args = parser.parse_args()
+path = args.json_path
+env_name = args.env_name
+reward_path = args.reward_path
 
 # load models
-# vae = load_model()
-# mdn_rnn = load_model()
-# cmaes = load_weights()
+vae = load_model()
+mdn_rnn = load_model()
+cmaes = load_weights()
 
-# read experiement parameters
+# read experiment parameters
 exp_params = json.load(open(path))
-env_name = exp_params['env_name']
 n_hidden = exp_params['n_hidden']
 # n_latent = exp_params['n_latent']
 n_action = exp_params['n_action']
 # n_mix = exp_params['n_mix']
+num_episodes = exp_params['num_episodes']
+num_steps = exp_params['num_steps']
 
 rewards = []
 
