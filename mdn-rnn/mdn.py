@@ -58,44 +58,33 @@ class MDNRNN():
 		rnn_out, self.hidden_state, self.cell_state = layers.LSTM(self.hps['rnn_size'], return_sequences=True, 
 													return_state=True, dropout=self.hps['dropout'], 
 													recurrent_dropout=self.hps['recurrent_dropout'])(self.input)
-		# Reshape RNN out to distribute sequences over batch dim. out shape = (batch*maxlen, RNN size)
-		rnn_out = self.output = layers.Lambda(
-								lambda x: K.reshape(x, (-1, self.hps['rnn_size'])), 
-								output_shape=(self.hps['rnn_size'],))(rnn_out)
-		# Apply MDN to each vector of every sequence seperatly. 
-		# Each RNN vector corresponds to out params, each with k gaussians defined by 3 params
-		# out shape = (batch * maxlen, out*kmix*3)
-		self.output = MDN(self.hps['out_width'] * self.hps['kmix'] * 3)(rnn_out)
-		# Again push everything to the batch dimension
-		# out shape = (batch * maxlen * out, kmix*3)
-
-		self.output = layers.Lambda(
-								lambda x: K.reshape(x, (-1, self.hps['kmix'] * 3)), 
-								output_shape=(self.hps['kmix'] * 3,))(self.output)
-
+		self.output = layers.TimeDistributed(MDN(self.hps['out_width'] * self.hps['kmix'] * 3))(rnn_out)
+		
 		self.model = Model(self.input, self.output)
 		print("Input:", self.model.input)
 		print("Output:", self.model.output)
 
-		self.model.compile(optimizer='adam', loss=MDNRNN.mdn_loss())
+		self.model.compile(optimizer='adam', loss=self.mdn_loss())
 	
 	def train(self, x, y):
 
 		self.model.fit(x, y, batch_size=self.hps['batch_size'], validation_split=self.hps['validation_split'])
 
-	def test(self, x, y):
+	def evaluate(self, x, y):
 		loss = self.model.evaluate(x, y, batch_size=self.hps['batch_size'])
 		return loss
 
+	def predict(self, x):
+		return self.model.predict(x)
+
 	def save(self, path):
-		self.model.save_weights(path + ".h5")
+		self.model.save(path + ".h5")
 		print("Saved!")
 
 	def restore(self, path):
 		print("Restoring from " + path)
-		self.model.load_weights(path + ".h5")
+		self.model.load(path + ".h5")
 		print("Restored!")
-
 
 	def get_mdn_coef(output):
 		# first column is the batch dimension
@@ -119,10 +108,12 @@ class MDNRNN():
 		out = -K.mean(v)
 		return out
 
-	def mdn_loss():
+	def mdn_loss(self):
 		def loss(y, output):
 			# reshape the y vector from (batch, maxlen, out) to (batch * maxlen * out, 1)
 			y = K.reshape(y, (-1, 1))
+			# out shape = (batch * maxlen * out, kmix*3)
+			output = K.reshape(output, (-1, self.hps['kmix'] * 3))
 			logmix, mean, logstd = MDNRNN.get_mdn_coef(output)
 			return MDNRNN.get_lossfunc(logmix, mean, logstd, y)
 		return loss
@@ -146,6 +137,8 @@ def main():
 	Y = np.random.normal(size=(10, hps['max_seq_len'], hps['out_width']))
 
 	mdnrnn.train(X, Y)
+
+	print("FINISH TRAIN")
 	mdnrnn.save("checkpoints/test1")
 	print("Loss", mdnrnn.test(X,Y))
 
