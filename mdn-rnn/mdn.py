@@ -4,6 +4,7 @@
 
 import numpy as np
 import keras
+import sys
 from keras import backend as K
 from keras import layers
 from keras.models import Model
@@ -67,12 +68,15 @@ class MDNRNN():
 		self.output = MDN(self.hps['out_width'] * self.hps['kmix'] * 3)(rnn_out)
 		# Again push everything to the batch dimension
 		# out shape = (batch * maxlen * out, kmix*3)
+
 		self.output = layers.Lambda(
 								lambda x: K.reshape(x, (-1, self.hps['kmix'] * 3)), 
 								output_shape=(self.hps['kmix'] * 3,))(self.output)
+
 		self.model = Model(self.input, self.output)
 		print("Input:", self.model.input)
 		print("Output:", self.model.output)
+
 		self.model.compile(optimizer='adam', loss=MDNRNN.mdn_loss())
 	
 	def train(self, x, y):
@@ -80,7 +84,18 @@ class MDNRNN():
 		self.model.fit(x, y, batch_size=self.hps['batch_size'], validation_split=self.hps['validation_split'])
 
 	def test(self, x, y):
-		loss, acc = self.model.evaluate(x, y, batch_size=self.hps[batch_size])
+		loss = self.model.evaluate(x, y, batch_size=self.hps['batch_size'])
+		return loss
+
+	def save(self, path):
+		self.model.save_weights(path + ".h5")
+		print("Saved!")
+
+	def restore(self, path):
+		print("Restoring from " + path)
+		self.model.load_weights(path + ".h5")
+		print("Restored!")
+
 
 	def get_mdn_coef(output):
 		# first column is the batch dimension
@@ -127,11 +142,12 @@ def main():
 
 	mdnrnn = MDNRNN(hps)
 	print("FINISHED BUILD")
-	X = np.random.normal(size=(1000, hps['max_seq_len'], hps['in_width']))
-	
-	Y = np.random.normal(size=(1000, hps['max_seq_len'], hps['out_width']))
+	X = np.random.normal(size=(10, hps['max_seq_len'], hps['in_width']))
+	Y = np.random.normal(size=(10, hps['max_seq_len'], hps['out_width']))
 
 	mdnrnn.train(X, Y)
+	mdnrnn.save("checkpoints/test1")
+	print("Loss", mdnrnn.test(X,Y))
 
 
 if __name__ == "__main__":
