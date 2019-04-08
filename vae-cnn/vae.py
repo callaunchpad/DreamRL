@@ -21,11 +21,7 @@ class VAE:
         self.batch_size = 64
         self.kernel_size = 4
         self.filters = 32
-<<<<<<< HEAD
-        self.epochs = 50
-=======
         self.epochs = 5
->>>>>>> e243748f2e644668ab0fbd013e202c2995081dc0
         self.lr = .0001
         self.num_channels = 3
         self.model_name = "conv_vae_latent_{}_model.h5"
@@ -259,12 +255,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
     # latent_dim = args.latent_size
     convVae = VAE()
-<<<<<<< HEAD
     convVae.make_vae(args.data, 2)
-=======
-    # TODO: put this in to argumentparser
-    convVae.make_vae("CartPole-v0_10_10.npz", 32)
->>>>>>> e243748f2e644668ab0fbd013e202c2995081dc0
     # The below line requires a ton of arguments
     # plot_model(convVae, to_file='vae_cnn.png', show_shapes=True)
 
