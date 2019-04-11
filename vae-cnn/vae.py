@@ -1,4 +1,4 @@
-# Author: Michael Huang, Andrew
+# Authors: Michael Huang, Andrew Chen
 
 import keras
 from keras.datasets import mnist
@@ -44,7 +44,7 @@ class VAE:
     def plot_results(self, models,
                      data,
                      batch_size=128,
-                     model_name="vae_mnist"):
+                     model_name="vae_gym"):
         """Plots labels and MNIST digits as a function of the 2D latent vector
         # Arguments
             models (tuple): encoder and decoder models
@@ -116,8 +116,8 @@ class VAE:
         image_size_y = x_train.shape[2]
         x_train = np.reshape(x_train, [-1, image_size_x, image_size_y, self.num_channels]) # 3 is # of color channels
         x_test = np.reshape(x_test, [-1, image_size_x, image_size_y, self.num_channels])
-        x_train = x_train.astype('float32') / 255
-        x_test = x_test.astype('float32') / 255
+        # x_train = x_train.astype('float32') / 255
+        # x_test = x_test.astype('float32') / 255
         return (x_train, y_train), (x_test, y_test)
 
     def make_models(self, inputs, latent_dim=2):
@@ -245,6 +245,8 @@ class VAE:
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
+    help_ = "Load training data"
+    parser.add_argument("-d", "--data", help=help_)
     help_ = "Load h5 model trained weights"
     parser.add_argument("-w", "--weights", help=help_)
     help_ = "Use mse loss instead of binary cross entropy (default)"
@@ -253,8 +255,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
     # latent_dim = args.latent_size
     convVae = VAE()
-    # TODO: put this in to argumentparser
-    convVae.make_vae("CartPole-v0_10_10.npz", 32)
+    convVae.make_vae(args.data, 2)
     # The below line requires a ton of arguments
     # plot_model(convVae, to_file='vae_cnn.png', show_shapes=True)
 
