@@ -5,7 +5,7 @@ import gym
 import cma
 import numpy as np
 
-model = Model([4, 64, 2])
+model = Model([4, 64, 64, 1])
 env = gym.make('CartPole-v0')
 
 def simulate(params):
@@ -14,7 +14,7 @@ def simulate(params):
     tot_reward = 0
     for _ in range(1000):
         action = model.get_action(obs)
-        obs, reward, done = env.step(np.round_(action))
+        obs, reward, done, info = env.step(int(round(action[0])))
         tot_reward += reward
         if done:
             break
