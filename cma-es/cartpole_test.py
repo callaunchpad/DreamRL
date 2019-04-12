@@ -12,7 +12,6 @@ env_name = 'CartPole-v0'
 model = Model([4, 1])
 
 # TODO: error with using TkAgg backend for both gym + plotting
-
 def run_test():
     env = gym.make(env_name)
     es = cma.CMAEvolutionStrategy(model.num_params * [0], 0.5)
@@ -26,13 +25,12 @@ def run_test():
         loss = [simulate(x, env) for x in solutions]
         es.tell(solutions, loss)
         
-        # mean solution
-        sol = np.mean(np.array(solutions), axis=0)
-        reward = -simulate(sol.tolist(), env)
+        reward = -sum(loss)/num_sols
         rewards.append(reward)
          
         # proj weights
-        proj = PCA(n_components=2).fit_transform(np.array(solutions)-sol)
+        mean_sol = np.mean(np.array(solutions), axis=0)
+        proj = PCA(n_components=2).fit_transform(np.array(solutions)-mean_sol)
         projs = np.vstack((projs, proj))
 
         es.logger.add()
