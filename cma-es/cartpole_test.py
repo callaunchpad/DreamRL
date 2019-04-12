@@ -1,32 +1,82 @@
+from sklearn.decomposition import PCA
+from matplotlib import animation
+import matplotlib.pyplot as plt
+import numpy as np
+import gym, cma
+import sys
 import sys
 sys.path.append('../model')
 from model import Model
-import gym
-import cma
-import numpy as np
 
-model = Model([4, 64, 64, 1])
-env = gym.make('CartPole-v0')
+env_name = 'CartPole-v0'
+model = Model([4, 1])
 
-def simulate(params):
+# TODO: error with using TkAgg backend for both gym + plotting
+
+def run_test():
+    env = gym.make(env_name)
+    es = cma.CMAEvolutionStrategy(model.num_params * [0], 0.5)
+    
+    num_sols = 8 # inherent to library
+    rewards = []
+    projs = np.array([]).reshape(0, 2)
+    iters = 0
+    while not es.stop():
+        solutions = es.ask()
+        loss = [simulate(x, env) for x in solutions]
+        es.tell(solutions, loss)
+        
+        # mean solution
+        sol = np.mean(np.array(solutions), axis=0)
+        reward = -simulate(sol.tolist(), env)
+        rewards.append(reward)
+         
+        # proj weights
+        proj = PCA(n_components=2).fit_transform(np.array(solutions)-sol)
+        projs = np.vstack((projs, proj))
+
+        es.logger.add()
+        # es.disp()
+
+        iters += 1
+        # UNCOMMENT THE LINE BELOW
+        # if iters % 10 == 0: visualize_env(sol.tolist())
+    env.close()
+    # UNCOMMENT THE LINE BELOW
+    # visualize_env(sol.tolist())
+    
+    def animate(i):
+        ax1.clear()
+        ax1.scatter(projs[:i*num_sols+1,0],projs[:i*num_sols+1,1])
+    
+    fig = plt.figure()
+    ax1 = fig.add_subplot(121)
+    ani = animation.FuncAnimation(fig, animate, interval=10)
+    ax2 = fig.add_subplot(122)
+    ax2.plot(rewards)
+    plt.show()
+
+def visualize_env(params, N=100):
+    model.load_weights(params)
+    test_env = gym.make(env_name)
+    obs = test_env.reset()
+    for _ in range(N):
+        test_env.render()
+        action = model.get_action(obs)
+        obs, reward, done, info = test_env.step(int(round(action[0])))
+        if done: break
+    test_env.close()
+
+def simulate(params, env, N=100):
     model.load_weights(params)
     obs = env.reset()
-    tot_reward = 0
-    for _ in range(1000):
+    total_reward = 0
+    for _ in range(N):
         action = model.get_action(obs)
         obs, reward, done, info = env.step(int(round(action[0])))
-        tot_reward += reward
-        if done:
-            break
-    return -reward
+        total_reward += reward
+        if done: break
+    return -total_reward
 
-es = cma.CMAEvolutionStrategy(model.num_params * [0], 0.5)
-while not es.stop():
-    solutions = es.ask()
-    es.tell(solutions, [simulate(x) for x in solutions])
-    es.logger.add()  # write data to disc to be plotted
-    es.disp()
-es.result_pretty()
-cma.plot()  # shortcut for es.logger.plot()
-
-env.close()
+if __name__ == '__main__':
+    run_test()
