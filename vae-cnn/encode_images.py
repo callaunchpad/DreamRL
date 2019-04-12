@@ -36,10 +36,14 @@ if __name__ == '__main__':
     # plt.show()
 
     latent_vectors = []
-    for i in range(len(conv_vae.x_test)):
-        latent_vectors.append(conv_vae.encode_image(conv_vae.x_test[i:i+1]*255))
+    # for i in range(len(conv_vae.x_test)):
+    #     latent_vectors.append(conv_vae.encode_image(conv_vae.x_test[i:i+1]))
+    raw_data = np.load(args.input + ".npz")
+    for f in sorted(raw_data.files):
+        images = raw_data[f]
+        latent_vectors.append([conv_vae.encode_image(np.array([image]))[0] for image in images])
 
-    np.savez_compressed(args.input + "_latent.npz", latent_vectors)
+    np.savez_compressed(args.input + "_latent.npz", *latent_vectors)
     if args.reconstruct:
         data = np.load(args.input + "_latent.npz")
         files = data.files
