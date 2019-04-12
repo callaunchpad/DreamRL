@@ -44,7 +44,6 @@ class MDNRNN():
 		self.hps = hyperparameters
 		self.build_model()
 
-
 	def build_model(self):
 		# Create Input layer: out shape = (batch, Length, latent_size + actions)
 		self.input = layers.Input(shape=(None, self.hps['in_width']), dtype='float32')
@@ -74,13 +73,13 @@ class MDNRNN():
 	def predict(self, x):
 		return self.model.predict(x)
 
-	def save(self, path):
-		self.model.save(path + ".h5")
+		def save(self, path):
+		self.model.save_weights(path + ".h5")
 		print("Saved!")
 
 	def restore(self, path):
 		print("Restoring from " + path)
-		self.model.load(path + ".h5")
+		self.model.load_weights(path + ".h5")
 		print("Restored!")
 
 	def get_mdn_coef(output):
