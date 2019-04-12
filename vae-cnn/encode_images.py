@@ -46,17 +46,16 @@ if __name__ == '__main__':
     np.savez_compressed(args.input + "_latent.npz", *latent_vectors)
     if args.reconstruct:
         data = np.load(args.input + "_latent.npz")
-        files = data.files
-        vectors = np.array(data[files[0]])
+        # files = data.files
+        # vectors = np.array(data[files[0]])
         reconstructed_images = []
-        for i in vectors:
-            a = np.array(conv_vae.decode_latent(i))
-            # print(a.shape)
-            a = a.reshape(-1, a.shape[-2], a.shape[-1])
-            reconstructed_images.append(a)
+        for f in sorted(data.files):
+            latents = data[f]
+            # a = a.reshape(-1, a.shape[-2], a.shape[-1])
+            reconstructed_images.append([conv_vae.decode_latent(np.array([l]))[0] for l in latents])
         # print(np.shape(np.array(reconstructed_images)))
 
         # plt.imshow(reconstructed_images[1])
 
         # plt.show()
-        np.savez_compressed(args.input + "_reconstructed.npz", reconstructed_images)
+        np.savez_compressed(args.input + "_recon.npz", *reconstructed_images)
