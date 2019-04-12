@@ -63,8 +63,7 @@ class MDNRNN():
 		self.get_out_and_rnn = K.function([self.input], [self.output, self.hidden_state, self.cell_state])
 	
 	def train(self, x, y):
-
-		self.model.fit(x, y, batch_size=self.hps['batch_size'], validation_split=self.hps['validation_split'])
+		self.model.fit(x, y, batch_size=self.hps['batch_size'], validation_split=self.hps['validation_split'], epochs=self.hps['epochs'])
 
 	def evaluate(self, x, y):
 		loss = self.model.evaluate(x, y, batch_size=self.hps['batch_size'])
@@ -73,7 +72,7 @@ class MDNRNN():
 	def predict(self, x):
 		return self.model.predict(x)
 
-		def save(self, path):
+	def save(self, path):
 		self.model.save_weights(path + ".h5")
 		print("Saved!")
 
@@ -147,7 +146,7 @@ class MDNRNN():
 		strokes = np.zeros((length, self.hps['out_width']), dtype=np.float32)
 		z = init_z.reshape((1, 1, self.hps['out_width']))
 		for i in range(length):
-			in_vec = np.concatenate((z, actions[i].reshape((1, 1, 3))), axis=2)
+			in_vec = np.concatenate((z, actions[i].reshape((1, 1, self.hps['action_size']))), axis=2)
 			out_vec = self.model.predict(in_vec)
 			out_vec = np.reshape(out_vec, (-1, self.hps['kmix'] * 3))
 			logmix, mean, logstd = MDNRNN.get_mdn_coef(out_vec)
@@ -176,33 +175,74 @@ class MDNRNN():
 		self.lstm.stateful = False
 		return strokes
 
+	def sample_output(self, output, temperature=1.0):
+		out_vec = np.reshape(out_vec, (-1, self.hps['kmix'] * 3))
+		logmix, mean, logstd = MDNRNN.get_mdn_coef(out_vec)
+		logmix = K.eval(logmix)
+		logmix2 = np.copy(logmix)/temperature
+		logmix2 -= logmix2.max()
+		logmix2 = np.exp(logmix2)
+		logmix2 /= logmix2.sum(axis=1).reshape(self.hps['out_width'], 1)
+
+		mixture_idx = np.zeros(self.hps['out_width'])
+		chosen_mean = np.zeros(self.hps['out_width'])
+		chosen_logstd = np.zeros(self.hps['out_width'])
+		for j in range(self.hps['out_width']):
+			idx = self.get_pi_idx(np.random.rand(), logmix2[j])
+			mixture_idx[j] = idx
+			chosen_mean[j] = mean[j][idx]
+			chosen_logstd[j] = logstd[j][idx]
+
+		rand_gaussian = np.random.randn(self.hps['out_width'])*np.sqrt(temperature)
+		return chosen_mean + np.exp(chosen_logstd)*rand_gaussian
+
 def main():
 	# TODO: Write MDN test here
 	hps = {}
-	hps['batch_size'] = 100
-	hps['max_seq_len'] = 1000
-	hps['in_width'] = 35 # latent + action
-	hps['out_width'] = 32 # Latent
-	hps['action_size'] = 3 # in width - out width
-	hps['rnn_size'] = 256
+	hps['batch_size'] = 5
+	hps['max_seq_len'] = 150
+	hps['in_width'] = 68 # latent + action
+	hps['out_width'] = 64 # Latent
+	hps['action_size'] = 4 # in width - out width
+	hps['rnn_size'] = 128
 	hps['kmix'] = 5
-	hps['dropout'] = 0.9
-	hps['recurrent_dropout'] = 0.9
+	hps['dropout'] = 0.5
+	hps['recurrent_dropout'] = 0.5
 	hps['validation_split'] = 0.1
+	hps['epochs'] = 24
 
 	mdnrnn = MDNRNN(hps)
 	print("FINISHED BUILD")
-	X = np.random.normal(size=(10, hps['max_seq_len'], hps['in_width']))
-	Y = np.random.normal(size=(10, hps['max_seq_len'], hps['out_width']))
+	X = np.load("data/LunarLander_MDN_input.npy")
+	Y = np.load("data/LunarLander_MDN_output.npy")
 
 	mdnrnn.train(X, Y)
 	print("FINISH TRAIN")
-	
-	mdnrnn.set_stateful(True)
-	z = np.random.normal(size=(1, 1, hps['out_width']))
-	actions = np.random.normal(size=(10, hps['action_size']))
-	mdnrnn.sample_sequence(z, actions, temperature=1.0, length=10)
 
+	reset_seq = np.zeros(shape=(1, 1, hps['in_width']))
+	
+	for test_ind in [0, 1]:
+		# Reset the MDNRNN
+		mdnrnn.stateful = False
+		mdnrnn.predict(reset_seq)
+
+		X_test = np.expand_dims(X[test_ind, :75, :], axis=0)
+		X_init_z = np.expand_dims(X[test_ind, 75, :64], axis=0)
+		X_actions =X[test_ind, 75:, 64:]
+
+		# Make predictions, start from halfway through sequence
+		mdnrnn.set_stateful(True)
+		mdnrnn.predict(X_test)
+		outs = mdnrnn.sample_sequence(X_init_z, X_actions, length=25)
+		np.save("results/LunarLanderSeq75-100_input_" + str(test_ind) + ".npy", outs)
+
+
+
+	# Test stateful stuff	
+	# mdnrnn.set_stateful(True)
+	# z = np.random.normal(size=(1, 1, hps['out_width']))
+	# actions = np.random.normal(size=(10, hps['action_size']))
+	# mdnrnn.sample_sequence(z, actions, temperature=1.0, length=10)
 
 
 if __name__ == "__main__":
