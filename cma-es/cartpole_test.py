@@ -12,7 +12,6 @@ import time
 env_name = 'CartPole-v0'
 model = Model([4, 1])
 
-# TODO: error with using TkAgg backend for both gym + plotting
 def run_test():
     env = gym.make(env_name)
     es = cma.CMAEvolutionStrategy(model.num_params * [0], 0.5)
@@ -25,10 +24,11 @@ def run_test():
         solutions = es.ask()
         loss = [simulate(x, env) for x in solutions]
         es.tell(solutions, loss)
-        
-        reward = -sum(loss)/num_sols
+
+        reward = -sum(loss)
         rewards.append(reward)
-         
+        best_sol = solutions[np.argmin(np.array(loss))]
+
         # proj weights
         mean_sol = np.mean(np.array(solutions), axis=0)
         proj = PCA(n_components=2).fit_transform(np.array(solutions)-mean_sol)
@@ -38,16 +38,20 @@ def run_test():
         # es.disp()
 
         # UNCOMMENT THE LINE BELOW
+<<<<<<< HEAD
         if iters % 10 == 0: visualize_env(solutions[np.argmin(loss)])
         iters += 1
+=======
+        # if iters % 10 == 0: visualize_env(best_sol)
+>>>>>>> 76c739bfe51bdb19ba1c60111f9da60af19fd648
     env.close()
     # UNCOMMENT THE LINE BELOW
-    # visualize_env(sol.tolist())
+    # visualize_env(best_sol)
     
     def animate(i):
         ax1.clear()
         ax1.scatter(projs[:i*num_sols+1,0],projs[:i*num_sols+1,1])
-    
+
     fig = plt.figure()
     ax1 = fig.add_subplot(121)
     ani = animation.FuncAnimation(fig, animate, interval=10)
