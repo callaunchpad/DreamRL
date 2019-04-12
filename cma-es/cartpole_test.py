@@ -7,6 +7,7 @@ import sys
 import sys
 sys.path.append('../model')
 from model import Model
+import time
 
 env_name = 'CartPole-v0'
 model = Model([4, 1])
@@ -36,9 +37,9 @@ def run_test():
         es.logger.add()
         # es.disp()
 
-        iters += 1
         # UNCOMMENT THE LINE BELOW
-        # if iters % 10 == 0: visualize_env(sol.tolist())
+        if iters % 10 == 0: visualize_env(solutions[np.argmin(loss)])
+        iters += 1
     env.close()
     # UNCOMMENT THE LINE BELOW
     # visualize_env(sol.tolist())
@@ -54,18 +55,19 @@ def run_test():
     ax2.plot(rewards)
     plt.show()
 
-def visualize_env(params, N=100):
+def visualize_env(params, N=200):
     model.load_weights(params)
     test_env = gym.make(env_name)
     obs = test_env.reset()
     for _ in range(N):
+        time.sleep(0.03)
         test_env.render()
         action = model.get_action(obs)
         obs, reward, done, info = test_env.step(int(round(action[0])))
         if done: break
     test_env.close()
 
-def simulate(params, env, N=100):
+def simulate(params, env, N=200):
     model.load_weights(params)
     obs = env.reset()
     total_reward = 0
