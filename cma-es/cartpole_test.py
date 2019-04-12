@@ -4,7 +4,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 import gym, cma
 import sys
-import sys
 sys.path.append('../model')
 from model import Model
 
