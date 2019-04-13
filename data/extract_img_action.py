@@ -10,7 +10,7 @@ parser.add_argument('env_name', type=str, help='environment name')
 parser.add_argument('--episodes', type=int, default=100, help='number of episodes')
 parser.add_argument('--steps', type=int, default=250, help='maximum sequence per episode')
 parser.add_argument('--box2d', type=bool, default=False, help='whether environment is box2d or not')
-parser.add_argument('--size', type=int, default=60, help='width/height of image')
+parser.add_argument('--size', type=int, default=120, help='width/height of image')
 
 def compress_image(img, size=60):
 	return resize(img, (size, size), mode='reflect', anti_aliasing=True)
