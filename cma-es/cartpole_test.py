@@ -4,7 +4,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 import gym, cma
 import sys
-import sys
 sys.path.append('../model')
 from model import Model
 import time
@@ -27,7 +26,7 @@ def run_test():
 
         reward = -sum(loss)
         rewards.append(reward)
-        best_sol = solutions[np.argmin(np.array(loss))]
+        best_sol = solutions[np.argmin(loss)]
 
         # proj weights
         mean_sol = np.mean(np.array(solutions), axis=0)
@@ -37,16 +36,10 @@ def run_test():
         es.logger.add()
         # es.disp()
 
-        # UNCOMMENT THE LINE BELOW
-<<<<<<< HEAD
-        if iters % 10 == 0: visualize_env(solutions[np.argmin(loss)])
+        if iters % 10 == 0: visualize_env(best_sol)
         iters += 1
-=======
-        # if iters % 10 == 0: visualize_env(best_sol)
->>>>>>> 76c739bfe51bdb19ba1c60111f9da60af19fd648
     env.close()
-    # UNCOMMENT THE LINE BELOW
-    # visualize_env(best_sol)
+    visualize_env(best_sol)
     
     def animate(i):
         ax1.clear()
