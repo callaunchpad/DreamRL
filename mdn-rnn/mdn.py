@@ -59,9 +59,9 @@ class MDNRNN():
 		print("Output:", self.model.output)
 
 		self.model.compile(optimizer='adam', loss=self.mdn_loss())
-
-		self.get_out_and_rnn = K.function([self.input], [self.output, self.hidden_state, self.cell_state])
 	
+		self.get_rnn_states = K.function([self.input], [self.hidden_state, self.cell_state])
+
 	def train(self, x, y):
 		self.model.fit(x, y, batch_size=self.hps['batch_size'], validation_split=self.hps['validation_split'], epochs=self.hps['epochs'])
 
@@ -119,16 +119,37 @@ class MDNRNN():
 	def set_stateful(self, boolean):
 		self.lstm.stateful = boolean
 
-	def rnn_next_state_init_seq(self, z, a, seq):		
-		out = self.model.predict(seq)
-		return self.rnn_next_state(z, a)
+	def reset_states(self):
+		self.model.reset_states()		
 
-	def rnn_next_state(self, z, a):
+	def rnn_next_state_stateful_init_seq(self, z, a, seq):		
+		out = self.model.predict(seq)
+		return self.rnn_next_state_stateful(z, a)
+
+	# Potential Alternative
+	'''
+	old_states = [state_h, state_c]
+	lstm_layer = model.get_layer('lstm')
+	lstm_layer.reset_states(states=old_states)
+	pred = model.predict(x=x)
+	new_states_to_save = [pred[1], pred[2]]
+	'''
+	
+	def rnn_next_state(self, z, a, h, c):
 		# Note that to run this stateful must be True!
 		input_x = np.concatenate((z.reshape((1, 1, self.hps['out_width'])),
 									a.reshape((1, 1, self.hps['action_size']))), axis=2)
-		out, h, c = self.get_out_and_rnn([input_x])
-		return h, c
+		self.lstm.reset_states(states=[h, c])
+		new_h, new_c = self.get_rnn_states([input_x])
+		return new_h, new_c
+
+	def rnn_next_state_stateful(self, z, a):
+		# Note that to run this stateful must be True!
+		# It will automatically continue from the last state
+		input_x = np.concatenate((z.reshape((1, 1, self.hps['out_width'])),
+									a.reshape((1, 1, self.hps['action_size']))), axis=2)
+		new_h, new_c = self.get_rnn_states([input_x])
+		return new_h, new_c
 
 	def get_pi_idx(self, x, pdf):
 		# samples from a categorial distribution
@@ -143,6 +164,7 @@ class MDNRNN():
 
 	def sample_sequence(self, init_z, actions, temperature=1.0, length=1000):
 		self.lstm.stateful = True
+		self.reset_states()
 		strokes = np.zeros((length, self.hps['out_width']), dtype=np.float32)
 		z = init_z.reshape((1, 1, self.hps['out_width']))
 		for i in range(length):
@@ -197,7 +219,7 @@ class MDNRNN():
 		return chosen_mean + np.exp(chosen_logstd)*rand_gaussian
 
 def main():
-	# TODO: Write MDN test here
+	# MDN Parameters
 	hps = {}
 	hps['batch_size'] = 5
 	hps['max_seq_len'] = 150
@@ -235,8 +257,6 @@ def main():
 		mdnrnn.predict(X_test)
 		outs = mdnrnn.sample_sequence(X_init_z, X_actions, length=25)
 		np.save("results/LunarLanderSeq75-100_input_" + str(test_ind) + ".npy", outs)
-
-
 
 	# Test stateful stuff	
 	# mdnrnn.set_stateful(True)
