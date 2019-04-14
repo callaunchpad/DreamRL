@@ -1,12 +1,37 @@
 import numpy as np
 import sys
+
+import keras
+from keras.datasets import mnist
+from keras.losses import mse, binary_crossentropy
+from keras import backend as K
+from keras.utils import plot_model
+from keras.models import Model
+from keras.layers import Lambda, Input, Dense
+
+from sklearn.model_selection import train_test_split
+import matplotlib.pyplot as plt
+from os import sys
+import argparse
+import os
+
 sys.path.insert(0, 'data')
 from extract_img_action import extract
 sys.path.insert(0, 'vae-cnn')
-from encode_images_func import encode
-
+from encode_images_func import encode 
+from vae import VAE
+sys.path.insert(0, 'mdn-rnn')
+from mdn import MDN
 
 img_path_name, action_path_name = extract("LunarLander-v2", 2500, 150, False, 80)
+
+# training VAE
+
+convVae = VAE()
+convVae.make_vae(img_path_name, 2)
+convVae.model_name = 'models/LunarLander_vae_64.h5'
+convVae.epochs = 1000
+convVae.train_vae()
 
 encode(img_path_name, 'vae-cnn/LunarLander_64.h5', 64, False)
 latent_path_name = img_path_name + '_latent.npz'
@@ -31,3 +56,28 @@ for f in latent.files:
 
 np.save('LunarLander_MDN_in', combined_input)
 np.save('LunarLander_MDN_out', combined_output)
+
+# training MDN
+
+# MDN Parameters
+hps = {}
+hps['batch_size'] = 5
+hps['max_seq_len'] = 150
+hps['in_width'] = 68 # latent + action
+hps['out_width'] = 64 # Latent
+hps['action_size'] = 4 # in width - out width
+hps['rnn_size'] = 128
+hps['kmix'] = 5
+hps['dropout'] = 0.5
+hps['recurrent_dropout'] = 0.5
+hps['validation_split'] = 0.1
+hps['epochs'] = 24
+
+mdnrnn = MDNRNN(hps)
+# print("FINISHED BUILD")
+X = np.load(combined_input)
+Y = np.load(combined_output)
+
+mdnrnn.train(X, Y)
+# print("FINISH TRAIN")
+mdnrnn.save('models/LunarLander_vae_64')
