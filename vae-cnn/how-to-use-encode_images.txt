@@ -1,2 +1,0 @@
-python encode_images.py LunarLander-v2_img_10_200 LunarLander_64 64 -e -r 
-python encode_images.py LunarLander-v2_img_10_200 LunarLander_64 -d 64 -l LunarLander-v2_img_10_200_latent -r
