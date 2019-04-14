@@ -4,9 +4,9 @@ import scipy.misc
 import matplotlib.pyplot as plt
 import argparse
 
-def vae_process_images(images, weights, dimension, latents, encode, reconstruct):
+def vae_process_images(images, weights, dimension, latents, encode, decode):
     conv_vae = VAE()
-    conv_vae.make_vae(images + ".npz", int(dimension))
+    conv_vae.make_vae(images + ".npz", dimension)
     conv_vae.load_model(weights + ".h5")
 
     latent_vectors = []
@@ -17,7 +17,7 @@ def vae_process_images(images, weights, dimension, latents, encode, reconstruct)
             latent_vectors.append([conv_vae.encode_image(np.array([image]))[0] for image in file_images])
         np.savez_compressed(images + "_latent.npz", *latent_vectors)
     
-    if reconstruct:
+    if decode:
         data = ""  
         if latents: 
             data = np.load(latents + ".npz") 
@@ -44,20 +44,20 @@ if __name__ == '__main__':
     # make this in to argument parser
     parser = argparse.ArgumentParser()
     help_ = "Name of images file without file extension"
-    parser.add_argument("images", help=help_)
+    parser.add_argument("images", help=help_, type=str)
     help_ = "Name of weights file without file extension"
-    parser.add_argument("weights", help=help_)
+    parser.add_argument("weights", help=help_, type=str)
     help_ = "Name of latents file"
-    parser.add_argument("dimension", help=help_)
+    parser.add_argument("dimension", help=help_, type=int)
     help_ = "Output encoded latent vectors in _latent.npz file"
-    parser.add_argument("-l", "--latents", help=help_)
+    parser.add_argument("-l", "--latents", help=help_, type=str)
     help_ = "Dimension of latent vectors"
     parser.add_argument("-e", "--encode", help=help_, action='store_true')
     help_ = "Output reconstructed images in _recon.npz file (if only this flag is on, then assume _latent.npz inputs)"
-    parser.add_argument("-r", "--reconstruct", help=help_, action='store_true')
+    parser.add_argument("-d", "--decode", help=help_, action='store_true')
     args = parser.parse_args()
 
-    vae_process_images(args.images, args.weights, args.dimension, args.latents, args.encode, args.reconstruct)
+    vae_process_images(args.images, args.weights, args.dimension, args.latents, args.encode, args.decode)
 
 
    
