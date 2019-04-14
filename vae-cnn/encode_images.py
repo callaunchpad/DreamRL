@@ -9,14 +9,14 @@ if __name__ == '__main__':
     # make this in to argument parser
     parser = argparse.ArgumentParser()
     help_ = "Name of input file without file extension"
-    parser.add_argument("-i", "--input", help=help_)
+    parser.add_argument("input", help=help_)
     help_ = "Name of weights file without file extension"
-    parser.add_argument("-w", "--weights", help=help_)
+    parser.add_argument("weights", help=help_)
     help_ = "Name of latents file"
+    parser.add_argument("dimension", help=help_)
+    help_ = "Output encoded latent vectors in _latent.npz file"
     parser.add_argument("-l", "--latents", help=help_)
     help_ = "Dimension of latent vectors"
-    parser.add_argument("-d", "--dimension", help=help_)
-    help_ = "Output encoded latent vectors in _latent.npz file"
     parser.add_argument("-e", "--encode", help=help_, action='store_true')
     help_ = "Output reconstructed images in _recon.npz file (if only this flag is on, then assume _latent.npz inputs)"
     parser.add_argument("-r", "--reconstruct", help=help_, action='store_true')
