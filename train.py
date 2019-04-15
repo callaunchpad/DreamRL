@@ -18,17 +18,19 @@ import os
 sys.path.insert(0, 'data')
 from extract_img_action import extract
 sys.path.insert(0, 'vae-cnn')
-from encode_images_func import encode 
+from encode_images_func import encode
 from vae import VAE
 sys.path.insert(0, 'mdn-rnn')
-from mdn import MDN
+from mdn import MDNRNN
 
+print("Extracting path...")
 img_path_name, action_path_name = extract("LunarLander-v2", 2500, 150, False, 80)
 
 # training VAE
 
+print("Training VAE...")
 convVae = VAE()
-convVae.make_vae(img_path_name, 2)
+convVae.make_vae(img_path_name + ".npz", 2)
 convVae.model_name = 'models/LunarLander_vae_64.h5'
 convVae.epochs = 1000
 convVae.train_vae()
@@ -47,6 +49,7 @@ def hot(tot, i):
     v[i] = 1
     return v
 
+print("Saving output...")
 for f in latent.files:
     c = np.concatenate([latent[f], np.array([hot(4, i) for i in act[f]])], axis=1)
     missing = 151 - c.shape[0]
@@ -60,6 +63,7 @@ np.save('LunarLander_MDN_out', combined_output)
 # training MDN
 
 # MDN Parameters
+print("Configuring MDN...")
 hps = {}
 hps['batch_size'] = 5
 hps['max_seq_len'] = 150
@@ -74,10 +78,10 @@ hps['validation_split'] = 0.1
 hps['epochs'] = 24
 
 mdnrnn = MDNRNN(hps)
-# print("FINISHED BUILD")
-X = np.load(combined_input)
-Y = np.load(combined_output)
+print("Finished building MDN, starting training...")
+X = np.load('LunarLander_MDN_in.npy')
+Y = np.load('LunarLander_MDN_out.npy')
 
 mdnrnn.train(X, Y)
-# print("FINISH TRAIN")
+print("Finished training mdn")
 mdnrnn.save('models/LunarLander_vae_64')
