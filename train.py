@@ -1,19 +1,7 @@
 import numpy as np
 import sys
-
-import keras
-from keras.datasets import mnist
-from keras.losses import mse, binary_crossentropy
-from keras import backend as K
-from keras.utils import plot_model
-from keras.models import Model
-from keras.layers import Lambda, Input, Dense
-
-from sklearn.model_selection import train_test_split
-import matplotlib.pyplot as plt
-from os import sys
+import json
 import argparse
-import os
 
 sys.path.insert(0, 'data')
 from extract_img_action import extract
@@ -23,65 +11,70 @@ from vae import VAE
 sys.path.insert(0, 'mdn-rnn')
 from mdn import MDNRNN
 
-print("Extracting path...")
-img_path_name, action_path_name = extract("LunarLander-v2", 2500, 150, False, 80)
+parser = argparse.ArgumentParser(description='Extract data, train VAE, train MDN.')
+parser.add_argument('json_path', type=str, help='Path to json with params.')
+# TODO: add option to use previously trained VAE or previously extracted data
 
-# training VAE
+def train(json_path):
+    # TODO: suppress VAE loading print statements
+    params = json.load(open(json_path))[0]
 
-print("Training VAE...")
-convVae = VAE()
-convVae.make_vae(img_path_name + ".npz", 2)
-convVae.model_name = 'models/LunarLander_vae_64.h5'
-convVae.epochs = 1000
-convVae.train_vae()
+    print("Extracting data...")
+    img_path_name, action_path_name = extract(
+        params['env_name'], params['num_eps'], params['max_seq_len'], False, params['img_size'])
 
-encode(img_path_name, 'vae-cnn/LunarLander_64.h5', 64, False)
-latent_path_name = img_path_name + '_latent.npz'
+    print("Training VAE...")
+    convVae = VAE()
+    convVae.make_vae(img_path_name + ".npz", params['latent_size'])
+    vae_path = params['vae_hps']['weights_path']
+    convVae.model_name = vae_path
+    convVae.epochs = params['vae_hps']['epochs']
+    convVae.train_vae()
 
-latent = np.load(latent_path_name) # (2500, ?, 64)
-act = np.load(action_path_name + '.npz') # (2500, ?, 1)
+    encode(img_path_name, vae_path, params['latent_size'], False)
+    latent_path_name = img_path_name + '_latent.npz'
 
-combined_input = []
-combined_output = []
+    latent = np.load(latent_path_name) # (2500, ?, 64)
+    act = np.load(action_path_name + '.npz') # (2500, ?, 1)
 
-def hot(tot, i):
-    v = np.zeros(tot)
-    v[i] = 1
-    return v
+    combined_input = []
+    combined_output = []
 
-print("Saving output...")
-for f in latent.files:
-    c = np.concatenate([latent[f], np.array([hot(4, i) for i in act[f]])], axis=1)
-    missing = 151 - c.shape[0]
-    c = np.concatenate([c, np.zeros((missing, 68))], axis=0)
-    combined_input.append(c[:-1])
-    combined_output.append(c[1:, :-4])
+    def hot(tot, i):
+        v = np.zeros(tot)
+        v[i] = 1
+        return v
 
-np.save('LunarLander_MDN_in', combined_input)
-np.save('LunarLander_MDN_out', combined_output)
+    print("Saving output...")
+    # TODO: Distinguish between discrete/continuous action spaces here
+    # TODO: Save in batches?
+    for f in latent.files:
+        c = np.concatenate([latent[f], np.array([hot(4, i) for i in act[f]])], axis=1)
+        missing = params['max_seq_len'] + 1 - c.shape[0]
+        c = np.concatenate([c, np.zeros((missing, params['latent_size'] + params['action_size']))], axis=0)
+        combined_input.append(c[:-1])
+        combined_output.append(c[1:, :-params['action_size']])
 
-# training MDN
+    np.save('LunarLander_MDN_in', combined_input)
+    np.save('LunarLander_MDN_out', combined_output)
 
-# MDN Parameters
-print("Configuring MDN...")
-hps = {}
-hps['batch_size'] = 5
-hps['max_seq_len'] = 150
-hps['in_width'] = 68 # latent + action
-hps['out_width'] = 64 # Latent
-hps['action_size'] = 4 # in width - out width
-hps['rnn_size'] = 128
-hps['kmix'] = 5
-hps['dropout'] = 0.5
-hps['recurrent_dropout'] = 0.5
-hps['validation_split'] = 0.1
-hps['epochs'] = 24
+    # MDN Parameters
+    # TODO: Change MDN to just take in entire params dictionary
+    print("Configuring MDN...")
+    mdn_hps = params['mdn_hps']
+    mdn_hps['max_seq_len'] = params['max_seq_len']
+    mdn_hps['in_width'] = params['latent_size'] + params['action_size']
+    mdn_hps['out_width'] = params['latent_size']
+    mdn_hps['action_size'] = params['action_size']
+    mdn_hps['rnn_size'] = params['hidden_size']
 
-mdnrnn = MDNRNN(hps)
-print("Finished building MDN, starting training...")
-X = np.load('LunarLander_MDN_in.npy')
-Y = np.load('LunarLander_MDN_out.npy')
+    mdnrnn = MDNRNN(mdn_hps)
+    print("Finished building MDN, starting training...")
 
-mdnrnn.train(X, Y)
-print("Finished training mdn")
-mdnrnn.save('models/LunarLander_vae_64')
+    mdnrnn.train(np.array(combined_input), np.array(combined_output))
+    print("Finished training mdn")
+    mdnrnn.save(params['mdn_hps']['weights_path'])
+
+if __name__ == '__main__':
+    args = parser.parse_args()
+    train(args.json_path)
