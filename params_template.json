@@ -1,6 +1,7 @@
 [
     {
         "env_name": "LunarLander-v2",
+        "dataset_path": "LunarLander-v2",
 
         "num_eps": 5,
         "max_seq_len": 10,

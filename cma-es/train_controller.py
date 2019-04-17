@@ -1,4 +1,11 @@
-json_path = ''
+import sys
+import numpy as np
+import cma
+
+sys.path.append('../model')
+from simulate import Simulation
+
+json_path = '../params_template.json'
 s = Simulation(json_path)
 
 es = cma.CMAEvolutionStrategy(s.controller.num_params * [0], 0.5)

@@ -15,7 +15,7 @@ parser.add_argument('--size', type=int, default=120, help='width/height of image
 def compress_image(img, size=60):
 	return resize(img, (size, size), mode='reflect', anti_aliasing=True)
 
-def extract(env_name, episodes, steps, box2d, size):
+def extract(env_name, episodes, steps, box2d, size, path=None):
 	env = gym.make(env_name)
 	ep_img_arr = []
 	ep_act_arr = []
@@ -38,8 +38,10 @@ def extract(env_name, episodes, steps, box2d, size):
 	            
 		ep_img_arr.append(step_img_arr)
 		ep_act_arr.append(step_act_arr)
-	img_path_name = env_name+"_img_"+str(episodes)+"_"+str(steps)
-	act_path_name = env_name+"_act_"+str(episodes)+"_"+str(steps)
+	img_path_name = path if path else env_name
+	act_path_name = path if path else env_name
+	img_path_name += "_img_" + str(episodes) + "_" + str(steps)
+	act_path_name += "_act_" + str(episodes) + "_" + str(steps)
 	np.savez_compressed(img_path_name, *ep_img_arr)
 	np.savez_compressed(act_path_name, *ep_act_arr)
 	return img_path_name, act_path_name

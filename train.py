@@ -20,8 +20,10 @@ def train(json_path):
     params = json.load(open(json_path))[0]
 
     print("Extracting data...")
+    # TODO: save data across more files? and all in some specific folder too
     img_path_name, action_path_name = extract(
-        params['env_name'], params['num_eps'], params['max_seq_len'], False, params['img_size'])
+        params['env_name'], params['num_eps'], params['max_seq_len'], False, 
+        params['img_size'], path=params['dataset_path'])
 
     print("Training VAE...")
     convVae = VAE()
@@ -46,7 +48,7 @@ def train(json_path):
         return v
 
     print("Saving output...")
-    # TODO: Distinguish between discrete/continuous action spaces here
+    # TODO: Distinguish between discrete/continuous action spaces here - file to convert actions to inputs?
     # TODO: Save in batches?
     for f in latent.files:
         c = np.concatenate([latent[f], np.array([hot(4, i) for i in act[f]])], axis=1)
