@@ -5,12 +5,15 @@ import cma
 sys.path.append('../model')
 from simulate import Simulation
 
+# TODO: function-ify this
 json_path = '../params_template.json'
 s = Simulation(json_path)
 
 es = cma.CMAEvolutionStrategy(s.controller.num_params * [0], 0.5)
 n_iters = 0
-while not es.stop():
+rewards = []
+while not es.stop() or n_iters >= s.params['cma-es_hps']['max_iters']:
+    # TODO: Number of models to make to be a param in the json
     solutions = es.ask()
     loss = []
     for x in solutions:
@@ -25,5 +28,7 @@ while not es.stop():
     es.logger.add()
 
     if n_iters % 10 == 0:
-        np.save(s.p['controller_weights_path']+'_{}'.format(n_iters), np.array(best_sol))
+        # TODO: Better naming
+        np.save('../' + s.params['cma-es_hps']['weights_dir'] +
+            '/cma_model_{}'.format(n_iters), np.array(best_sol))
     n_iters += 1

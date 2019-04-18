@@ -1,18 +1,17 @@
 [
     {
-        "env_name": "LunarLander-v2",
+        "env_name": "Pendulum-v0",
         "dataset_path": "LunarLander-v2",
 
         "num_eps": 5,
         "max_seq_len": 10,
 
         "img_size": 100,
-        "action_size": 4,
         "latent_size": 32,
         "hidden_size": 128,
 
         "vae_hps": {
-            "epochs": 10,
+            "epochs": 3,
             "weights_path": "models/LunarLander_VAE_test.h5"
         },
 
@@ -24,6 +23,11 @@
             "validation_split": 0.5,
             "epochs": 1,
             "weights_path": "models/LunarLander_MDN_test.h5"
+        },
+
+        "cma-es_hps": {
+            "max_iter": 1000,
+            "weights_dir": "models/"
         }
     }
 ]
