@@ -4,152 +4,112 @@
 #			 https://machinelearningmastery.com/text-generation-lstm-recurrent-neural-networks-python-keras/
 
 import numpy as np
-import keras
-import sys
-from keras import backend as K
-from keras import layers
-from keras.models import Model
+import tensorflow as tf
+import time
 
 ## CONSTANTS
 logSqrtTwoPI = np.log(np.sqrt(2.0 * np.pi))
 
-class MDN(layers.Layer):
-	def __init__(self, output_dim, **kwargs):
-		self.output_dim = output_dim
-		super(MDN, self).__init__(**kwargs)
-
-	def build(self, input_shape):
-		# Create a trainable weight variable for this layer.
-		self.kernel = self.add_weight(name='kernel', 
-									shape=(input_shape[1], self.output_dim),
-									initializer='truncated_normal',
-									trainable=True)
-		self.bias = self.add_weight(name='kernel', 
-									shape=(self.output_dim,),
-									initializer='zeros',
-									trainable=True)
-
-		super(MDN, self).build(input_shape)  # Be sure to call this at the end
-
-	def call(self, x):
-		output = K.dot(x, self.kernel)
-		output = K.bias_add(output, self.bias)
-		return output
-
-	def compute_output_shape(self, input_shape):
-		return (input_shape[0], self.output_dim)
 
 class MDNRNN():
 	def __init__(self, hyperparameters):
 		self.hps = hyperparameters
-		self.build_model()
+		self.g = tf.Graph()
+		with self.g.as_default():
+			self.build_model()
+		self.init_sess()
 
 	def build_model(self):
-		# Create Input layer: out shape = (batch, Length, latent_size + actions)
-		self.input = layers.Input(shape=(None, self.hps['in_width']), dtype='float32')
-		# Create RNN Cell (with droput!). out shape = (batch, maxlen, RNN size)
-		self.lstm = layers.LSTM(self.hps['rnn_size'], return_sequences=True, 
-													return_state=True, dropout=self.hps['dropout'], 
-													recurrent_dropout=self.hps['recurrent_dropout'])
-		rnn_out, self.hidden_state, self.cell_state = self.lstm(self.input)
-		self.output = layers.TimeDistributed(MDN(self.hps['out_width'] * self.hps['kmix'] * 3))(rnn_out)
+		if self.hps['training']:
+			self.global_step = tf.Variable(0, name='global_step', trainable=False)
+
+		self.input = tf.placeholder(dtype=tf.float32, shape=[self.hps['batch_size'], self.hps['max_seq_len'], self.hps['in_width']])
+		self.output = tf.placeholder(dtype=tf.float32, shape=[self.hps['batch_size'], self.hps['max_seq_len'], self.hps['out_width']])
+
+		# RNN
+		cell = tf.contrib.rnn.LayerNormBasicLSTMCell(self.hps['rnn_size'], dropout_keep_prob=self.hps['recurrent_dropout'])
+		self.cell = tf.contrib.rnn.DropoutWrapper(cell, input_keep_prob=self.hps['dropout'])
+
+		self.initial_state = self.cell.zero_state(batch_size=self.hps['batch_size'], dtype=tf.float32)
+
+		output, last_state = tf.nn.dynamic_rnn(self.cell, self.input, initial_state=self.initial_state,
+                                           time_major=False, swap_memory=True, dtype=tf.float32)
+
+		self.final_state = last_state
+		# MDN
+		output = tf.reshape(output, [-1, self.hps['rnn_size']])
+		output_w = tf.get_variable("output_w", [self.hps['rnn_size'], self.hps['out_width'] * self.hps['kmix'] * 3])
+		output_b = tf.get_variable("output_b", [self.hps['out_width'] * self.hps['kmix'] * 3])
+		output = tf.nn.xw_plus_b(output, output_w, output_b)
+		output = tf.reshape(output, [-1, self.hps['kmix'] * 3])
+
+		self.out_logmix, self.out_mean, self.out_logstd = MDNRNN.get_mdn_coef(output)
 		
-		self.model = Model(self.input, self.output)
-		print("Input:", self.model.input)
-		print("Output:", self.model.output)
+		flat_target_data = tf.reshape(self.output, [-1, 1])
 
-		self.model.compile(optimizer='adam', loss=self.mdn_loss())
-	
-		self.get_rnn_states = K.function([self.input], [self.hidden_state, self.cell_state])
+		lossfunc = MDNRNN.get_lossfunc(self.out_logmix, self.out_mean, self.out_logstd, flat_target_data)
 
-	def train(self, x, y):
-		self.model.fit(x, y, batch_size=self.hps['batch_size'], validation_split=self.hps['validation_split'], epochs=self.hps['epochs'])
+		self.cost = tf.reduce_mean(lossfunc)
 
-	def evaluate(self, x, y):
-		loss = self.model.evaluate(x, y, batch_size=self.hps['batch_size'])
-		return loss
+		if self.hps['training']:
+			self.lr = tf.Variable(self.hps['lr'], trainable=False)
+			optimizer = tf.train.AdamOptimizer(self.lr)
+			gvs = optimizer.compute_gradients(self.cost)
+			capped_gvs = [(tf.clip_by_value(grad, -self.hps['grad_clip'], self.hps['grad_clip']), var) for grad, var in gvs]
+			self.train_op = optimizer.apply_gradients(capped_gvs, global_step=self.global_step, name='train_step')
 
-	def predict(self, x):
-		return self.model.predict(x)
+		self.init = tf.global_variables_initializer()
 
-	def save(self, path):
-		self.model.save_weights(path + ".h5")
-		print("Saved!")
-
-	def restore(self, path):
-		print("Restoring from " + path)
-		self.model.load_weights(path + ".h5")
-		print("Restored!")
+	def init_sess(self):
+		self.sess = tf.Session(graph=self.g)
+		self.sess.run(self.init)
 
 	def get_mdn_coef(output):
 		# first column is the batch dimension
-		assert output.shape[1] % 3 == 0
-		num_components = int(int(output.shape[1]) / 3)
-		
-		logmix = output[:, :num_components]
-		mean = output[:, num_components: 2*num_components]
-		logstd = output[:, 2*num_components:]
-
-		logmix = logmix - K.logsumexp(logmix, axis=1, keepdims=True)
-
+		logmix, mean, logstd = tf.split(output, 3, 1)
+		logmix = logmix - tf.reduce_logsumexp(logmix, 1, keepdims=True)
 		return logmix, mean, logstd
 
 	def lognormal(y, mean, logstd):
-		return -0.5 * ((y - mean) / K.exp(logstd)) ** 2 - logstd - logSqrtTwoPI
+		return -0.5 * ((y - mean) / tf.exp(logstd)) ** 2 - logstd - logSqrtTwoPI
 
 	def get_lossfunc(logmix, mean, logstd, y):
 		v = logmix + MDNRNN.lognormal(y, mean, logstd)
-		v = K.logsumexp(v, 1, keepdims=True)
-		out = -K.mean(v)
+		v = tf.reduce_logsumexp(v, 1, keepdims=True)
+		out = -tf.reduce_mean(v)
 		return out
 
-	def mdn_loss(self):
-		def loss(y, output):
-			# reshape the y vector from (batch, maxlen, out) to (batch * maxlen * out, 1)
-			y = K.reshape(y, (-1, 1))
-			# out shape = (batch * maxlen * out, kmix*3)
-			output = K.reshape(output, (-1, self.hps['kmix'] * 3))
-			logmix, mean, logstd = MDNRNN.get_mdn_coef(output)
-			return MDNRNN.get_lossfunc(logmix, mean, logstd, y)
-		return loss
+	def train(self, x, y):
+		start = time.time()
 
-	def get_lstm_value(self):
-		return self.hidden_state, self.cell_state
+		for step in range(self.hps['num_steps']):
+			s = self.sess.run(self.global_step)
+			
+			# Can Adjust Later
+			lr = self.hps['lr']
 
-	def set_stateful(self, boolean):
-		self.lstm.stateful = boolean
+			indices = np.random.permutation(len(x))[:self.hps['batch_size']]
+			batch_x = x[indices]
+			batch_y = y[indices]
 
-	def reset_states(self):
-		self.model.reset_states()		
+			feed = {self.input: batch_x, self.output: batch_y, self.lr: lr}
+			(train_cost, state, train_step, _) = self.sess.run([self.cost, self.final_state, self.global_step, self.train_op], feed)
 
-	def rnn_next_state_stateful_init_seq(self, z, a, seq):		
-		out = self.model.predict(seq)
-		return self.rnn_next_state_stateful(z, a)
+			if (step%20==0 and step > 0):
+				end = time.time()
+				time_taken = end-start
+				start = time.time()
+				output_log = "step: %d, lr: %.6f, cost: %.4f, train_time_taken: %.4f" % (step, lr, train_cost, time_taken)
+				print(output_log)
 
-	# Potential Alternative
-	'''
-	old_states = [state_h, state_c]
-	lstm_layer = model.get_layer('lstm')
-	lstm_layer.reset_states(states=old_states)
-	pred = model.predict(x=x)
-	new_states_to_save = [pred[1], pred[2]]
-	'''
-	
-	def rnn_next_state(self, z, a, h, c):
-		# Note that to run this stateful must be True!
+	def rnn_init_state(self):
+		return self.sess.run(rnn.initial_state)
+
+	def rnn_next_state(self, z, a, prev_state):
 		input_x = np.concatenate((z.reshape((1, 1, self.hps['out_width'])),
 									a.reshape((1, 1, self.hps['action_size']))), axis=2)
-		self.lstm.reset_states(states=[h, c])
-		new_h, new_c = self.get_rnn_states([input_x])
-		return new_h, new_c
-
-	def rnn_next_state_stateful(self, z, a):
-		# Note that to run this stateful must be True!
-		# It will automatically continue from the last state
-		input_x = np.concatenate((z.reshape((1, 1, self.hps['out_width'])),
-									a.reshape((1, 1, self.hps['action_size']))), axis=2)
-		new_h, new_c = self.get_rnn_states([input_x])
-		return new_h, new_c
+		feed = {self.input: input_x, self.initial_state: prev_state}
+		return rnn.sess.run(rnn.final_state, feed)
 
 	def get_pi_idx(self, x, pdf):
 		# samples from a categorial distribution
@@ -163,13 +123,14 @@ class MDNRNN():
 		return -1
 
 	def sample_sequence(self, init_z, actions, temperature=1.0, length=1000):
-		self.lstm.stateful = True
-		self.reset_states()
+		prev_state = self.sess.run(self.initial_state)
+
 		strokes = np.zeros((length, self.hps['out_width']), dtype=np.float32)
 		z = init_z.reshape((1, 1, self.hps['out_width']))
 		for i in range(length):
 			in_vec = np.concatenate((z, actions[i].reshape((1, 1, self.hps['action_size']))), axis=2)
-			out_vec = self.model.predict(in_vec)
+			feed = {self.input: in_vec, self.initial_state : prev_state}
+			[logmix, mean, logstd, next_state] = sess.run([s_model.out_logmix, s_model.out_mean, s_model.out_logstd, s_model.final_state], feed)
 			out_vec = np.reshape(out_vec, (-1, self.hps['kmix'] * 3))
 			logmix, mean, logstd = MDNRNN.get_mdn_coef(out_vec)
 			logmix = K.eval(logmix)
@@ -230,8 +191,10 @@ def main():
 	hps['kmix'] = 5
 	hps['dropout'] = 0.5
 	hps['recurrent_dropout'] = 0.5
-	hps['validation_split'] = 0.1
-	hps['epochs'] = 24
+	hps['num_steps'] = 100
+	hps['training'] = True
+	hps['lr'] = 0.001
+	hps['grad_clip'] = 1.0
 
 	mdnrnn = MDNRNN(hps)
 	print("FINISHED BUILD")
@@ -240,29 +203,6 @@ def main():
 
 	mdnrnn.train(X, Y)
 	print("FINISH TRAIN")
-
-	reset_seq = np.zeros(shape=(1, 1, hps['in_width']))
-	
-	for test_ind in [0, 1]:
-		# Reset the MDNRNN
-		mdnrnn.stateful = False
-		mdnrnn.predict(reset_seq)
-
-		X_test = np.expand_dims(X[test_ind, :75, :], axis=0)
-		X_init_z = np.expand_dims(X[test_ind, 75, :64], axis=0)
-		X_actions =X[test_ind, 75:, 64:]
-
-		# Make predictions, start from halfway through sequence
-		mdnrnn.set_stateful(True)
-		mdnrnn.predict(X_test)
-		outs = mdnrnn.sample_sequence(X_init_z, X_actions, length=25)
-		np.save("results/LunarLanderSeq75-100_input_" + str(test_ind) + ".npy", outs)
-
-	# Test stateful stuff	
-	# mdnrnn.set_stateful(True)
-	# z = np.random.normal(size=(1, 1, hps['out_width']))
-	# actions = np.random.normal(size=(10, hps['action_size']))
-	# mdnrnn.sample_sequence(z, actions, temperature=1.0, length=10)
 
 
 if __name__ == "__main__":
