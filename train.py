@@ -1,3 +1,4 @@
+import os
 import numpy as np
 import sys
 import json
@@ -5,7 +6,7 @@ import argparse
 import gym
 
 sys.path.insert(0, 'data')
-from extract_img_action import extract
+from extract_img_action import extract, get_path_names
 from action_utils import ActionUtils
 sys.path.insert(0, 'vae-cnn')
 from encode_images_func import encode
@@ -14,8 +15,9 @@ sys.path.insert(0, 'mdn-rnn')
 from mdn import MDNRNN
 
 parser = argparse.ArgumentParser(description='Extract data, train VAE, train MDN.')
-parser.add_argument('json_path', type=str, help='Path to json with params.')
-# TODO: add option to use previously trained VAE or previously extracted data
+parser.add_argument('json_path', type=str, help='Path to JSON file with model params.')
+parser.add_argument('--use-previous-dataset', default=False, help='Use previously generated dataset', action='store_true')
+parser.add_argument('--use-trained-vae', default=False, help='Use previously trained VAE', action='store_true')
 
 def train(json_path):
     # TODO: suppress VAE loading print statements
@@ -23,17 +25,32 @@ def train(json_path):
 
     print("Extracting data...")
     # TODO: save data across more files? and all in some specific folder too
-    img_path_name, action_path_name = extract(
-        params['env_name'], params['num_eps'], params['max_seq_len'], False, 
-        params['img_size'], path=params['dataset_path'])
+    if not args.use_previous_dataset:
+	    img_path_name, action_path_name = extract(
+	        params['env_name'], params['num_eps'], params['max_seq_len'], False,
+	        params['img_size'], path=params['dataset_path'])
+    else:
+    	print("Using previously trained dataset.")
+    	img_path_name, action_path_name = get_path_names(params['dataset_path'],
+    		params['env_name'],params['num_eps'], params['max_seq_len'])
+    	if not os.path.isfile(img_path_name + ".npz") or not os.path.isfile(action_path_name + ".npz"):
+    		return print("ERROR: One or more of the previously trained dataset paths \
+    			(`{}` or `{}`) does not exist".format(img_path_name, action_path_name))
 
     print("Training VAE...")
     convVae = VAE()
     convVae.make_vae(img_path_name + ".npz", params['latent_size'])
     vae_path = params['vae_hps']['weights_path']
-    convVae.model_name = vae_path
-    convVae.epochs = params['vae_hps']['epochs']
-    convVae.train_vae()
+    if args.use_trained_vae:
+    	if not os.path.isfile(vae_path):
+    		return print("ERROR: No file exists at the VAE model path you passed (`{}`)".format(vae_path))
+    	else:
+    		print("Loading VAE model from given path.")
+    	convVae.load_model(vae_path)
+    else:
+	    convVae.model_name = vae_path
+	    convVae.epochs = params['vae_hps']['epochs']
+	    convVae.train_vae()
 
     encode(img_path_name, vae_path, params['latent_size'], False)
     latent_path_name = img_path_name + '_latent.npz'
@@ -73,7 +90,7 @@ def train(json_path):
     print("Finished building MDN, starting training...")
 
     mdnrnn.train(np.array(combined_input), np.array(combined_output))
-    print("Finished training mdn")
+    print("Finished training MDN.")
     mdnrnn.save(params['mdn_hps']['weights_path'])
 
 if __name__ == '__main__':
