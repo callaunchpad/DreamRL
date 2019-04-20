@@ -3,7 +3,7 @@
         "env_name": "Pendulum-v0",
         "dataset_path": "LunarLander-v2",
 
-        "num_eps": 5,
+        "num_eps": 10,
         "max_seq_len": 10,
 
         "img_size": 100,
