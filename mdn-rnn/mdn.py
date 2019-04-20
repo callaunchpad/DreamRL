@@ -6,6 +6,7 @@
 import numpy as np
 import tensorflow as tf
 import time
+import json
 
 ## CONSTANTS
 logSqrtTwoPI = np.log(np.sqrt(2.0 * np.pi))
@@ -33,7 +34,7 @@ class MDNRNN():
 		self.initial_state = self.cell.zero_state(batch_size=self.hps['batch_size'], dtype=tf.float32)
 
 		output, last_state = tf.nn.dynamic_rnn(self.cell, self.input, initial_state=self.initial_state,
-                                           time_major=False, swap_memory=True, dtype=tf.float32)
+										   time_major=False, swap_memory=True, dtype=tf.float32)
 
 		self.final_state = last_state
 		# MDN
@@ -60,6 +61,16 @@ class MDNRNN():
 
 		self.init = tf.global_variables_initializer()
 
+		t_vars = tf.trainable_variables()
+
+		self.assign_ops = {}
+		for var in t_vars:
+			#if var.name.startswith('mdn_rnn'):
+			pshape = var.get_shape()
+			pl = tf.placeholder(tf.float32, pshape, var.name[:-2]+'_placeholder')
+			assign_op = var.assign(pl)
+			self.assign_ops[var] = (assign_op, pl)
+
 	def init_sess(self):
 		self.sess = tf.Session(graph=self.g)
 		self.sess.run(self.init)
@@ -78,6 +89,49 @@ class MDNRNN():
 		v = tf.reduce_logsumexp(v, 1, keepdims=True)
 		out = -tf.reduce_mean(v)
 		return out
+
+	def get_model_params(self):
+		# get trainable params.
+		model_names = []
+		model_params = []
+		model_shapes = []
+		with self.g.as_default():
+			t_vars = tf.trainable_variables()
+			for var in t_vars:
+				#if var.name.startswith('mdn_rnn'):
+				param_name = var.name
+				p = self.sess.run(var)
+				model_names.append(param_name)
+				params = np.round(p*10000).astype(np.int).tolist()
+				model_params.append(params)
+				model_shapes.append(p.shape)
+		return model_params, model_shapes, model_names
+
+	def set_model_params(self, params):
+		with self.g.as_default():
+			t_vars = tf.trainable_variables()
+			idx = 0
+			for var in t_vars:
+				#if var.name.startswith('mdn_rnn'):
+				pshape = tuple(var.get_shape().as_list())
+				p = np.array(params[idx])
+				assert pshape == p.shape, "inconsistent shape"
+				assign_op, pl = self.assign_ops[var]
+				self.sess.run(assign_op, feed_dict={pl.name: p/10000.})
+				idx += 1
+
+	def load(self, path):
+		with open(path, 'r') as f:
+			params = json.load(f)
+			self.set_model_params(params)
+
+	def save(self, path):
+		model_params, model_shapes, model_names = self.get_model_params()
+		qparams = []
+		for p in model_params:
+			qparams.append(p)
+		with open(path, 'wt') as outfile:
+			json.dump(qparams, outfile, sort_keys=True, indent=0, separators=(',', ': '))
 
 	def train(self, x, y):
 		start = time.time()
@@ -103,13 +157,13 @@ class MDNRNN():
 				print(output_log)
 
 	def rnn_init_state(self):
-		return self.sess.run(rnn.initial_state)
+		return self.sess.run(self.initial_state)
 
 	def rnn_next_state(self, z, a, prev_state):
 		input_x = np.concatenate((z.reshape((1, 1, self.hps['out_width'])),
 									a.reshape((1, 1, self.hps['action_size']))), axis=2)
 		feed = {self.input: input_x, self.initial_state: prev_state}
-		return rnn.sess.run(rnn.final_state, feed)
+		return self.sess.run(self.final_state, feed)
 
 	def get_pi_idx(self, x, pdf):
 		# samples from a categorial distribution
@@ -118,7 +172,7 @@ class MDNRNN():
 		for i in range(0, N):
 			accumulate += pdf[i]
 			if (accumulate >= x):
-		  		return i
+				return i
 		print('error with sampling ensemble')
 		return -1
 
@@ -179,6 +233,14 @@ class MDNRNN():
 		rand_gaussian = np.random.randn(self.hps['out_width'])*np.sqrt(temperature)
 		return chosen_mean + np.exp(chosen_logstd)*rand_gaussian
 
+	def set_hps_to_inference(hps):
+		hps = hps.copy()
+		hps['batch_size'] = 1
+		hps['max_seq_len'] = 1
+		hps['use_recurrent_dropout'] = 0
+		hps['training'] = 0
+		return hps
+
 def main():
 	# MDN Parameters
 	hps = {}
@@ -191,7 +253,7 @@ def main():
 	hps['kmix'] = 5
 	hps['dropout'] = 0.5
 	hps['recurrent_dropout'] = 0.5
-	hps['num_steps'] = 100
+	hps['num_steps'] = 50
 	hps['training'] = True
 	hps['lr'] = 0.001
 	hps['grad_clip'] = 1.0
@@ -203,7 +265,19 @@ def main():
 
 	mdnrnn.train(X, Y)
 	print("FINISH TRAIN")
+	mdnrnn.save("checkpoints/lunar.json")
 
+	hps_inf = MDNRNN.set_hps_to_inference(hps)
+	mdnrnn_inf = MDNRNN(hps_inf)
+	mdnrnn_inf.load("checkpoints/lunar.json")
+
+	state = mdnrnn_inf.rnn_init_state()
+	print(state)
+	z = np.random.normal(size=(1, 1, hps['out_width']))
+	a = np.random.normal(size=(1, hps['action_size']))
+
+	state = mdnrnn_inf.rnn_next_state(z, a, state)
+	print(state)
 
 if __name__ == "__main__":
 	main()

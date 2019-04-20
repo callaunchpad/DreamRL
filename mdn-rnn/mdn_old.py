@@ -266,8 +266,8 @@ def main():
 	h = np.zeros((1, hps['rnn_size']))
 	c = np.zeros((1, hps['rnn_size']))
 	h, c = mdnrnn.rnn_next_state_stateful(z, a)
-	h, c = mdnrnn.rnn_next_state_stateful(z+1, a)
-	h, c = mdnrnn.rnn_next_state_stateful(z+2, a)
+	h, c = mdnrnn.rnn_next_state_stateful(z + 1, a)
+	h, c = mdnrnn.rnn_next_state_stateful(z + 2, a)
 
 
 if __name__ == "__main__":
