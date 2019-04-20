@@ -205,7 +205,7 @@ class MDNRNN():
 			next_x = chosen_mean + np.exp(chosen_logstd)*rand_gaussian
 
 			strokes[i,:] = next_x
-
+			prev_state = next_state
 			z = np.reshape(next_x, (1, 1, self.hps['out_width']))
 
 		return strokes
@@ -235,7 +235,7 @@ class MDNRNN():
 		rand_gaussian = np.random.randn(self.hps['out_width'])*np.sqrt(temperature)
 		z = chosen_mean + np.exp(chosen_logstd)*rand_gaussian
 		z = np.reshape(z, (1, 1, self.hps['out_width']))
-		return z
+		return z, next_state
 
 	def set_hps_to_inference(hps):
 		hps = hps.copy()
