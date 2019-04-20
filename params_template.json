@@ -21,8 +21,11 @@
             "dropout": 0.5,
             "recurrent_dropout": 0.1,
             "validation_split": 0.5,
-            "epochs": 1,
-            "weights_path": "models/LunarLander_MDN_test.h5"
+            "num_steps": 1000,
+            "weights_path": "models/LunarLander_MDN_test.h5",
+            "training": true,
+            "lr": 0.001,
+            "grad_clip": 1
         },
 
         "cma-es_hps": {
