@@ -45,7 +45,7 @@ class MDNRNN():
 		output = tf.reshape(output, [-1, self.hps['kmix'] * 3])
 
 		self.out_logmix, self.out_mean, self.out_logstd = MDNRNN.get_mdn_coef(output)
-		
+
 		flat_target_data = tf.reshape(self.output, [-1, 1])
 
 		lossfunc = MDNRNN.get_lossfunc(self.out_logmix, self.out_mean, self.out_logstd, flat_target_data)
@@ -138,7 +138,7 @@ class MDNRNN():
 
 		for step in range(self.hps['num_steps']):
 			s = self.sess.run(self.global_step)
-			
+
 			# Can Adjust Later
 			lr = self.hps['lr']
 
@@ -186,7 +186,7 @@ class MDNRNN():
 			in_vec = np.concatenate((z, actions[i].reshape((1, 1, self.hps['action_size']))), axis=2)
 			feed = {self.input: in_vec, self.initial_state : prev_state}
 			[logmix, mean, logstd, next_state] = self.sess.run([self.out_logmix, self.out_mean, self.out_logstd, self.final_state], feed)
-			
+
 			logmix2 = np.copy(logmix)/temperature
 			logmix2 -= logmix2.max()
 			logmix2 = np.exp(logmix2)
@@ -216,7 +216,7 @@ class MDNRNN():
 		feed = {self.input: in_vec, self.initial_state : prev_state}
 
 		[logmix, mean, logstd, next_state] = self.sess.run([self.out_logmix, self.out_mean, self.out_logstd, self.final_state], feed)
-		
+
 		logmix2 = np.copy(logmix)/temperature
 		logmix2 -= logmix2.max()
 		logmix2 = np.exp(logmix2)
@@ -286,7 +286,7 @@ def main():
 	# Test Sample Z
 	z = np.random.normal(size=(1, 1, hps['out_width']))
 	a = np.random.normal(size=(1, hps['action_size']))
-	z = mdnrnn_inf.sample_z(z, a, state)
+	z, state = mdnrnn_inf.sample_z(z, a, state)
 	print(z)
 
 	# Test Sample Seq

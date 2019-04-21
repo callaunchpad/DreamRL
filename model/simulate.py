@@ -12,7 +12,7 @@ sys.path.append('../mdn-rnn/')
 from mdn import MDNRNN
 
 class Simulation:
-    def __init__(self, path): 
+    def __init__(self, path):
         self.params = json.load(open(path))[0]
         self.load_model()
         self.env = gym.make(self.params['env_name'])
@@ -35,41 +35,63 @@ class Simulation:
         mdn_hps['out_width'] = p['latent_size']
         mdn_hps['action_size'] = self.action_size
         mdn_hps['rnn_size'] = p['hidden_size']
+        mdn_hps['batch_size'] = 1
+        mdn_hps['max_seq_len'] = 1
+        mdn_hps['use_recurrent_dropout'] = 0
+        mdn_hps['training'] = 0
+        # self.mdn_rnn = MDNRNN(mdn_hps)
+        # hps_inf = MDNRNN.set_hps_to_inference(hps)
         self.mdn_rnn = MDNRNN(mdn_hps)
-        self.mdn_rnn.restore('../' + p['mdn_hps']['weights_path'])
+        self.mdn_rnn.load('../' + p['mdn_hps']['weights_path'])
 
         self.controller = ControllerModel([p['latent_size'] + p['hidden_size'], self.action_size])
         if controller_weights:
             self.controller.load_weights(controller_weights)
 
-    def simulate(self, render=False):
+    def simulate(self, dreaming=False, render=False):
         rewards = []
         for i in range(1):
             obs = self.env.reset()
-    
+
             # initialize hidden + action variables
-            # TODO: this stateful stuff is sketch and I don't know if it's right
-            self.mdn_rnn.set_stateful(False)
-            self.mdn_rnn.reset_states()
-            self.mdn_rnn.set_stateful(True)
+            state = self.mdn_rnn.rnn_init_state()
             a = self.action_utils.action_to_input(self.env.action_space.sample())
             h = np.zeros((1, self.params['hidden_size']))
             c = np.zeros((1, self.params['hidden_size']))
 
             total_reward = 0
-            for t in range(self.params['max_seq_len']):
+            if dreaming:
                 img = self.env.render(mode='rgb_array')
                 img = compress_image(img, size=self.params['img_size'])
-
-                # compute action
                 z = self.vae.encode_image(np.array([img]))[0]
-                h, c = self.mdn_rnn.rnn_next_state_stateful(z, a)
-                out = self.controller.get_action(np.concatenate((z, h[0])))
+                for t in range(self.params['max_seq_len']):
+                    z_current = z.copy()
+                    z, state = self.mdn_rnn.sample_z(z_current, a, state)
+                    z = z[0][0]
+                    h, c = state[0], state[1]
+                    out = self.controller.get_action(np.concatenate((z_current, h[0])))
 
-                obs, reward, done, info = self.env.step(self.action_utils.output_to_action(out))
-                total_reward += reward
-                if done:
-                    print('Episode finished after {} timesteps'.format(t+1))
-                    break
+                    obs, reward, done, info = self.env.step(self.action_utils.output_to_action(out))
+                    total_reward += reward
+                    if done:
+                        print('Episode finished after {} timesteps'.format(t+1))
+                        break
+            else:
+                for t in range(self.params['max_seq_len']):
+                    img = self.env.render(mode='rgb_array')
+                    img = compress_image(img, size=self.params['img_size'])
+
+                    # compute action
+                    z = self.vae.encode_image(np.array([img]))[0]
+                    state = self.mdn_rnn.rnn_next_state(z, a, state)
+                    h, c = state[0], state[1]
+                    out = self.controller.get_action(np.concatenate((z, h[0])))
+
+                    a = self.action_utils.output_to_action(out)
+                    obs, reward, done, info = self.env.step(a)
+                    total_reward += reward
+                    if done:
+                        print('Episode finished after {} timesteps'.format(t+1))
+                        break
             rewards.append(total_reward)
         return -np.mean(rewards)

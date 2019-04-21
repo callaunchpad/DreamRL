@@ -173,7 +173,33 @@ class VAE:
 
 
         models = (self.encoder, self.decoder)
-        data = (self.x_test, y_test)
+        reconstruction_loss = binary_crossentropy(K.flatten(self.inputs),
+                                                  K.flatten(self.outputs))
+        reconstruction_loss *= image_size_x * image_size_y * self.num_channels
+        kl_loss = 1 + self.z_log_var - K.square(self.z_mean) - K.exp(self.z_log_var)
+        kl_loss = K.sum(kl_loss, axis=-1)
+        kl_loss *= -0.5
+        vae_loss = K.mean(reconstruction_loss + kl_loss)
+        self.vae.add_loss(vae_loss)
+        rmsprop = keras.optimizers.RMSprop(lr=self.lr, rho=0.9, epsilon=None, decay=0.0)
+        self.vae.compile(rmsprop)
+        self.vae.summary()
+
+    def make_vae_shape(self, image_size_x, image_size_y, latent_size):
+        input_shape = (image_size_x, image_size_y, self.num_channels)
+        self.inputs = Input(shape=input_shape, name='encoder_input')
+        self.encoder, self.decoder, self.outputs, self.vae = self.make_models(self.inputs, latent_size)
+
+        # CODE THAT TESTS IF ENCODING AND DECODING WORKS
+        # x_test_feed = np.reshape(self.x_test, [-1, image_size_x, image_size_y, 1])
+        # latent_vector = self.encode_image(x_test_feed)
+        # print("output for encode:" )
+        # print(latent_vector)
+        # print("output for decode:" )
+        # print(self.decode_latent(latent_vector))
+
+
+        models = (self.encoder, self.decoder)
         reconstruction_loss = binary_crossentropy(K.flatten(self.inputs),
                                                   K.flatten(self.outputs))
         reconstruction_loss *= image_size_x * image_size_y * self.num_channels
