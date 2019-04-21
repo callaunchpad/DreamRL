@@ -31,8 +31,10 @@ def train_controller(json_path):
 
         es.logger.add()
 
-        if n_iters % 10 == 0:
+        if n_iters % 100 == 0:
             # TODO: Better naming
+            np.save('../' + s.params['cma-es_hps']['weights_dir'] +
+                '/cma_model_rewards_{}'.format(n_iters), np.array(rewards))
             np.save('../' + s.params['cma-es_hps']['weights_dir'] +
                 '/cma_model_{}'.format(n_iters), np.array(best_sol))
         n_iters += 1
