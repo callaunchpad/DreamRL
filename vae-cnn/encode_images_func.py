@@ -35,7 +35,6 @@ def encode(_input, weights, latent, reconstruct):
         np.savez_compressed(_input + "_recon.npz", *reconstructed_images)
 
 if __name__ == '__main__':
-    # make this in to argument parser
     parser = argparse.ArgumentParser()
     help_ = "Name of input without npzs"
     parser.add_argument("-i", "--input", help=help_)
@@ -48,4 +47,3 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
     encode(args.input, args.weights, args.latent, args.reconstruct)
-
