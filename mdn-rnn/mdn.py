@@ -181,13 +181,12 @@ class MDNRNN():
 
 		strokes = np.zeros((length, self.hps['out_width']), dtype=np.float32)
 		z = init_z.reshape((1, 1, self.hps['out_width']))
+
 		for i in range(length):
 			in_vec = np.concatenate((z, actions[i].reshape((1, 1, self.hps['action_size']))), axis=2)
 			feed = {self.input: in_vec, self.initial_state : prev_state}
-			[logmix, mean, logstd, next_state] = sess.run([s_model.out_logmix, s_model.out_mean, s_model.out_logstd, s_model.final_state], feed)
-			out_vec = np.reshape(out_vec, (-1, self.hps['kmix'] * 3))
-			logmix, mean, logstd = MDNRNN.get_mdn_coef(out_vec)
-			logmix = K.eval(logmix)
+			[logmix, mean, logstd, next_state] = self.sess.run([self.out_logmix, self.out_mean, self.out_logstd, self.final_state], feed)
+			
 			logmix2 = np.copy(logmix)/temperature
 			logmix2 -= logmix2.max()
 			logmix2 = np.exp(logmix2)
@@ -206,16 +205,18 @@ class MDNRNN():
 			next_x = chosen_mean + np.exp(chosen_logstd)*rand_gaussian
 
 			strokes[i,:] = next_x
-
+			prev_state = next_state
 			z = np.reshape(next_x, (1, 1, self.hps['out_width']))
 
-		self.lstm.stateful = False
 		return strokes
 
-	def sample_output(self, output, temperature=1.0):
-		out_vec = np.reshape(out_vec, (-1, self.hps['kmix'] * 3))
-		logmix, mean, logstd = MDNRNN.get_mdn_coef(out_vec)
-		logmix = K.eval(logmix)
+	def sample_z(self, z, a, prev_state, temperature=1.0):
+		in_vec = np.concatenate((z.reshape((1, 1, self.hps['out_width'])),
+									a.reshape((1, 1, self.hps['action_size']))), axis=2)
+		feed = {self.input: in_vec, self.initial_state : prev_state}
+
+		[logmix, mean, logstd, next_state] = self.sess.run([self.out_logmix, self.out_mean, self.out_logstd, self.final_state], feed)
+		
 		logmix2 = np.copy(logmix)/temperature
 		logmix2 -= logmix2.max()
 		logmix2 = np.exp(logmix2)
@@ -224,6 +225,7 @@ class MDNRNN():
 		mixture_idx = np.zeros(self.hps['out_width'])
 		chosen_mean = np.zeros(self.hps['out_width'])
 		chosen_logstd = np.zeros(self.hps['out_width'])
+
 		for j in range(self.hps['out_width']):
 			idx = self.get_pi_idx(np.random.rand(), logmix2[j])
 			mixture_idx[j] = idx
@@ -231,7 +233,9 @@ class MDNRNN():
 			chosen_logstd[j] = logstd[j][idx]
 
 		rand_gaussian = np.random.randn(self.hps['out_width'])*np.sqrt(temperature)
-		return chosen_mean + np.exp(chosen_logstd)*rand_gaussian
+		z = chosen_mean + np.exp(chosen_logstd)*rand_gaussian
+		z = np.reshape(z, (1, 1, self.hps['out_width']))
+		return z, next_state
 
 	def set_hps_to_inference(hps):
 		hps = hps.copy()
@@ -278,6 +282,19 @@ def main():
 
 	state = mdnrnn_inf.rnn_next_state(z, a, state)
 	print(state)
+
+	# Test Sample Z
+	z = np.random.normal(size=(1, 1, hps['out_width']))
+	a = np.random.normal(size=(1, hps['action_size']))
+	z = mdnrnn_inf.sample_z(z, a, state)
+	print(z)
+
+	# Test Sample Seq
+	init_z = np.random.normal(size=(1, 1, hps['out_width']))
+	actions = np.random.normal(size=(10, hps['action_size']))
+	zs = mdnrnn_inf.sample_sequence(init_z, actions, length=10)
+	print(zs)
+
 
 if __name__ == "__main__":
 	main()
