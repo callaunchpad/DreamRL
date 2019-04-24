@@ -43,7 +43,7 @@ def train(json_path, use_previous_dataset=False, use_trained_vae=False):
     convVae.make_vae(img_path_name + ".npz", params['latent_size'])
     sys.stdout = sys.__stdout__
     vae_path = params['vae_hps']['weights_path']
-    if args.use_trained_vae:
+    if use_trained_vae:
     	if not os.path.isfile(vae_path):
     		return print("ERROR: No file exists at the VAE model path you passed (`{}`)".format(vae_path))
     	else:
