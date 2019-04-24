@@ -11,7 +11,7 @@ parser = argparse.ArgumentParser(description='Extract data, train VAE, train MDN
 parser.add_argument('json_path', type=str, help='Path to JSON file with model params.')
 parser.add_argument('--dreaming', default=False, help='Whether models dreams or not')
 
-def train_controller(json_path):
+def train_controller(json_path, dreaming=False):
     s = Simulation(json_path)
 
     es = cma.CMAEvolutionStrategy(s.controller.num_params * [0], 0.5)
@@ -23,7 +23,7 @@ def train_controller(json_path):
         loss = []
         for x in solutions:
             s.controller.set_weights(x)
-            loss.append(s.simulate(dreaming=args.dreaming))
+            loss.append(s.simulate(dreaming=dreaming))
         es.tell(solutions, loss)
 
         reward = -sum(loss)
@@ -42,4 +42,4 @@ def train_controller(json_path):
 
 if __name__ == '__main__':
     args = parser.parse_args()
-    train_controller(args.json_path)
+    train_controller(args.json_path, dreaming=args.dreaming)

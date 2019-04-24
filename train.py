@@ -19,13 +19,13 @@ parser.add_argument('json_path', type=str, help='Path to JSON file with model pa
 parser.add_argument('-d', '--use-previous-dataset', default=False, help='Use previously generated dataset', action='store_true')
 parser.add_argument('-v', '--use-trained-vae', default=False, help='Use previously trained VAE', action='store_true')
 
-def train(json_path):
+def train(json_path, use_previous_dataset=False, use_trained_vae=False):
     # TODO: suppress VAE loading print statements
     params = json.load(open(json_path))[0]
 
     print("Extracting data...")
     # TODO: save data across more files? and all in some specific folder too
-    if not args.use_previous_dataset:
+    if not use_previous_dataset:
 	    img_path_name, action_path_name = extract(
 	        params['env_name'], params['num_eps'], params['max_seq_len'], False,
 	        params['img_size'], path=params['dataset_path'])
@@ -97,4 +97,4 @@ def train(json_path):
 
 if __name__ == '__main__':
     args = parser.parse_args()
-    train(args.json_path)
+    train(args.json_path, use_previous_dataset=args.use_previous_dataset, use_trained_vae=args.use_trained_vae)
