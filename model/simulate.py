@@ -1,6 +1,7 @@
 import json
 import gym
 import numpy as np
+import os
 from controller_model import ControllerModel
 import sys
 sys.path.append('../data/')
@@ -23,9 +24,9 @@ class Simulation:
         self.action_size = self.action_utils.action_size()
 
         self.vae = VAE()
-        # TODO: Make VAE not need to load entire datset to be made
-        self.vae.make_vae('../' + p['dataset_path'] + "_img_" + str(p['num_eps']) + "_" + str(p['max_seq_len']) + '.npz',
-            p['latent_size'])
+        sys.stdout = open(os.devnull, 'w')
+        self.vae.make_vae_shape(p['img_size'], p['img_size'], p['latent_size'])
+        sys.stdout = sys.__stdout__
         self.vae.load_model('../' + p['vae_hps']['weights_path'])
 
         # TODO: Make MDN just take in all of params.

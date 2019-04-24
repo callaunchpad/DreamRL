@@ -9,15 +9,15 @@ sys.path.insert(0, 'data')
 from extract_img_action import extract, get_path_names
 from action_utils import ActionUtils
 sys.path.insert(0, 'vae-cnn')
-from encode_images_func import encode
+from vae_process_images import vae_process_images
 from vae import VAE
 sys.path.insert(0, 'mdn-rnn')
 from mdn import MDNRNN
 
 parser = argparse.ArgumentParser(description='Extract data, train VAE, train MDN.')
 parser.add_argument('json_path', type=str, help='Path to JSON file with model params.')
-parser.add_argument('--use-previous-dataset', default=False, help='Use previously generated dataset', action='store_true')
-parser.add_argument('--use-trained-vae', default=False, help='Use previously trained VAE', action='store_true')
+parser.add_argument('-d', '--use-previous-dataset', default=False, help='Use previously generated dataset', action='store_true')
+parser.add_argument('-v', '--use-trained-vae', default=False, help='Use previously trained VAE', action='store_true')
 
 def train(json_path):
     # TODO: suppress VAE loading print statements
@@ -39,7 +39,9 @@ def train(json_path):
 
     print("Training VAE...")
     convVae = VAE()
+    sys.stdout = open(os.devnull, 'w')
     convVae.make_vae(img_path_name + ".npz", params['latent_size'])
+    sys.stdout = sys.__stdout__
     vae_path = params['vae_hps']['weights_path']
     if args.use_trained_vae:
     	if not os.path.isfile(vae_path):
@@ -52,11 +54,11 @@ def train(json_path):
 	    convVae.epochs = params['vae_hps']['epochs']
 	    convVae.train_vae()
 
-    encode(img_path_name, vae_path, params['latent_size'], False)
+    vae_process_images(img_path_name, vae_path, params['latent_size'], decode=False, image_size=params['img_size'])
     latent_path_name = img_path_name + '_latent.npz'
 
-    latent = np.load(latent_path_name) # (2500, ?, 64)
-    act = np.load(action_path_name + '.npz') # (2500, ?, 1)
+    latent = np.load(latent_path_name)
+    act = np.load(action_path_name + '.npz')
 
     combined_input = []
     combined_output = []

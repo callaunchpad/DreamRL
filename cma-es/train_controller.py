@@ -2,6 +2,7 @@ import sys
 import numpy as np
 import cma
 import argparse
+import os
 
 sys.path.append('../model')
 from simulate import Simulation
@@ -22,14 +23,14 @@ def train_controller(json_path):
         loss = []
         for x in solutions:
             s.controller.set_weights(x)
-            loss.append(s.simulate(args.dreaming))
+            loss.append(s.simulate(dreaming=args.dreaming))
         es.tell(solutions, loss)
 
         reward = -sum(loss)
         rewards.append(reward)
         best_sol = solutions[np.argmin(loss)]
 
-        es.logger.add()
+        # es.logger.add()
 
         if n_iters % 100 == 0:
             # TODO: Better naming
