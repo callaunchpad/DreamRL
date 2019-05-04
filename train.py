@@ -36,27 +36,28 @@ def train(json_path, use_previous_dataset=False, use_trained_vae=False):
     	if not os.path.isfile(img_path_name + ".npz") or not os.path.isfile(action_path_name + ".npz"):
     		return print("ERROR: One or more of the previously trained dataset paths \
     			(`{}` or `{}`) does not exist".format(img_path_name, action_path_name))
+    print("Data extraction finished.")
 
-    print("Training VAE...")
-    convVae = VAE()
-    sys.stdout = open(os.devnull, 'w')
-    convVae.make_vae(img_path_name + ".npz", params['latent_size'])
-    sys.stdout = sys.__stdout__
     vae_path = params['vae_hps']['weights_path']
     if use_trained_vae:
     	if not os.path.isfile(vae_path):
     		return print("ERROR: No file exists at the VAE model path you passed (`{}`)".format(vae_path))
-    	else:
-    		print("Loading VAE model from given path.")
-    	convVae.load_model(vae_path)
+        # print("Using previously trained VAE.")
     else:
-	    convVae.model_name = vae_path
-	    convVae.epochs = params['vae_hps']['epochs']
-	    convVae.train_vae()
+        print("Training VAE...")
+        convVae = VAE()
+        sys.stdout = open(os.devnull, 'w')
+        convVae.make_vae(img_path_name + ".npz", params['latent_size'])
+        sys.stdout = sys.__stdout__
+        convVae.model_name = vae_path
+        convVae.epochs = params['vae_hps']['epochs']
+        convVae.train_vae()
 
+    print("Processing images for MDN input...")
     vae_process_images(img_path_name, vae_path, params['latent_size'], decode=False, image_size=params['img_size'])
+    
+    print("Formatting MDN training data...")
     latent_path_name = img_path_name + '_latent.npz'
-
     latent = np.load(latent_path_name)
     act = np.load(action_path_name + '.npz')
 
@@ -65,8 +66,6 @@ def train(json_path, use_previous_dataset=False, use_trained_vae=False):
 
     utils = ActionUtils(params['env_name'])
     action_size = utils.action_size()
-
-    print("Saving output...")
     # TODO: Save in batches?
     for f in latent.files:
         c = np.concatenate([latent[f], np.array([utils.action_to_input(a) for a in act[f]])], axis=1)

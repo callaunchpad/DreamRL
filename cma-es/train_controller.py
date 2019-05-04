@@ -5,6 +5,7 @@ import argparse
 import os
 
 sys.path.append('../model')
+sys.path.append('model')
 from simulate import Simulation
 
 parser = argparse.ArgumentParser(description='Extract data, train VAE, train MDN.')
@@ -35,7 +36,7 @@ def train_controller(json_path, dreaming=False):
         if n_iters % 100 == 0:
             # TODO: Better naming
             np.save('../' + s.params['cma-es_hps']['weights_dir'] +
-                '/cma_model_rewards_{}'.format(n_iters), np.array(rewards))
+                '/cma_model_rewards', np.array(rewards))
             np.save('../' + s.params['cma-es_hps']['weights_dir'] +
                 '/cma_model_{}'.format(n_iters), np.array(best_sol))
         n_iters += 1

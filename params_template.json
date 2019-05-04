@@ -1,6 +1,6 @@
 [
     {
-        "env_name": "Pendulum-v0",
+        "env_name": "CartPole-v0",
         "dataset_path": "LunarLander-v2",
 
         "num_eps": 10,
