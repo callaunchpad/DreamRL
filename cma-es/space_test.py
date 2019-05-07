@@ -99,5 +99,5 @@ def simulate(params, env, N=200):
     return -total_reward
 
 if __name__ == '__main__':
-    run_test()
-    # visualize_env('./lunar-lander_linear_sol900.npy')
+    # run_test()
+    visualize_env('./sp_linear_sol20.npy')
