@@ -13,9 +13,9 @@ sys.path.append('../mdn-rnn/')
 from mdn import MDNRNN
 
 class Simulation:
-    def __init__(self, path):
+    def __init__(self, path, controller_weights=None):
         self.params = json.load(open(path))[0]
-        self.load_model()
+        self.load_model(controller_weights=controller_weights)
         self.env = gym.make(self.params['env_name'])
 
     def load_model(self, controller_weights=None):
@@ -56,7 +56,7 @@ class Simulation:
 
             # initialize hidden + action variables
             state = self.mdn_rnn.rnn_init_state()
-            a = self.action_utils.action_to_input(self.env.action_space.sample())
+            a = self.env.action_space.sample()
             h = np.zeros((1, self.params['hidden_size']))
             c = np.zeros((1, self.params['hidden_size']))
 
@@ -67,7 +67,7 @@ class Simulation:
                 z = self.vae.encode_image(np.array([img]))[0]
                 for t in range(self.params['max_seq_len']):
                     z_current = z.copy()
-                    z, state = self.mdn_rnn.sample_z(z_current, a, state)
+                    z, state = self.mdn_rnn.sample_z(z_current, self.action_utils.action_to_input(a), state)
                     z = z[0][0]
                     h, c = state[0], state[1]
                     out = self.controller.get_action(np.concatenate((z_current, h[0])))
@@ -84,7 +84,8 @@ class Simulation:
 
                     # compute action
                     z = self.vae.encode_image(np.array([img]))[0]
-                    state = self.mdn_rnn.rnn_next_state(z, a, state)
+                    print(a)
+                    state = self.mdn_rnn.rnn_next_state(z, self.action_utils.action_to_input(a), state)
                     h, c = state[0], state[1]
                     out = self.controller.get_action(np.concatenate((z, h[0])))
 
@@ -96,3 +97,7 @@ class Simulation:
                         break
             rewards.append(total_reward)
         return -np.mean(rewards)
+
+s=Simulation("../configs/LunarLander-test.json", controller_weights="../model_weights/LunarLander_cma/cma_model_4100.npy")
+for i in range(10):
+    s.simulate()
