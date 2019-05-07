@@ -1,0 +1,36 @@
+[
+    {
+        "env_name": "SpaceInvaders-v0",
+        "dataset_path": "SpaceInvaders-v0",
+
+        "num_eps": 250,
+        "max_seq_len": 200,
+
+        "img_size": 120,
+        "latent_size": 64,
+        "hidden_size": 128,
+
+        "vae_hps": {
+            "epochs": 1000,
+            "weights_path": "model_weights/SpaceInvaders_64.h5"
+        },
+
+        "mdn_hps": {
+            "kmix": 5,
+            "batch_size": 100,
+            "dropout": 0.5,
+            "recurrent_dropout": 0.1,
+            "validation_split": 0.15,
+            "num_steps": 10000,
+            "weights_path": "model_weights/SpaceInvaders_MDN_test.h5",
+            "training": true,
+            "lr": 0.001,
+            "grad_clip": 1
+        },
+
+        "cma-es_hps": {
+            "max_iter": 1000,
+            "weights_dir": "model_weights/cma/"
+        }
+    }
+]
