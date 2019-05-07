@@ -176,9 +176,9 @@ class MDNRNN():
 		print('error with sampling ensemble')
 		return -1
 
-	def sample_sequence(self, init_z, actions, temperature=1.0, length=1000):
-		prev_state = self.sess.run(self.initial_state)
-
+	def sample_sequence(self, init_z, actions, temperature=1.0, length=1000, prev_state=None):
+		if prev_state is None:
+			prev_state = self.sess.run(self.initial_state)
 		strokes = np.zeros((length, self.hps['out_width']), dtype=np.float32)
 		z = init_z.reshape((1, 1, self.hps['out_width']))
 
