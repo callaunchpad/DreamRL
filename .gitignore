@@ -7,7 +7,7 @@ __pycache__/
 *.so
 
 *.npz
-*.h5
+#*.h5
 
 # Distribution / packaging
 .Python

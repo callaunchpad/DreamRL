@@ -17,14 +17,14 @@ from mdn import MDNRNN
 
 # Set up Paths
 # Lunar Lander
-# MDNRNN_PATH = "model_weights/LunarLander_MDN_test.h5"
-# VAE_PATH = "model_weights/LunarLander_VAE_test.h5"
-# CONFIG_PATH = "configs/LunarLander-test.json"
+MDNRNN_PATH = "model_weights/LunarLander_MDN_test.h5"
+VAE_PATH = "model_weights/LunarLander_VAE_test.h5"
+CONFIG_PATH = "configs/LunarLander-test.json"
 
 # Space Invaders
-MDNRNN_PATH = "model_weights/SpaceInvaders_MDN_test.h5"
-VAE_PATH = "model_weights/SpaceInvaders_64.h5"
-CONFIG_PATH = "configs/SpaceInvaders-test.json"
+# MDNRNN_PATH = "model_weights/SpaceInvaders_MDN_test.h5"
+# VAE_PATH = "model_weights/SpaceInvaders_VAE_test.h5"
+# CONFIG_PATH = "configs/SpaceInvaders-test.json"
 
 def dream_vis(env, mdnrnn, vae, params, mdn_hps, name, seq_length=25, skip_actions=30):
     observation = env.reset()
